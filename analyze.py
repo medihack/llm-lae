@@ -180,7 +180,7 @@ class Findings(BaseModel):
         ..., description="Wurde eine LAE im Unterlappen links gefunden?"
     )
     # Valid values 0-40
-    clot_burden_score: int | None = Field(
+    clot_burden_score: float | None = Field(
         ...,
         description="Wie hoch ist der Thrombuslastgrad beschrieben "
         "(Heidelberg Clot Burden Score)? "
