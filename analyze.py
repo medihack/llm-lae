@@ -69,7 +69,7 @@ class ClinicalInformation(BaseModel):
         "Falls ja, bitte den Wert eintragen. "
         "Falls keine Angabe dazu vorhanden ist, dann mit 'None' antworten.",
     )
-    nt_pro_bnp_elevated: float | None = Field(
+    nt_pro_bnp_elevated: bool | None = Field(
         ..., description="Ist ein erhöhter NT-proBNP-Wert angegeben? "
     )
     nt_pro_bnp_value: float | None = Field(
