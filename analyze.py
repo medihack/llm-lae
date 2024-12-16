@@ -1,5 +1,6 @@
 from enum import Enum
 import os
+from typing import Any
 from pydantic import BaseModel, Field
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -412,24 +413,44 @@ def extract_report(report: str) -> ExtractedData:
 
 def extract_reports(
     df: pd.DataFrame, study_id_column: str, report_column: str
-) -> list[ExtractedData]:
+) -> dict[str, ExtractedData]:
     logging.info("Extracting data from reports.")
 
-    extracted_data = []
+    extracted_data: dict[str, ExtractedData] = {}
     for _, row in track(
         df.iterrows(), total=df.shape[0], description="Extracting data from reports ..."
     ):
         logging.info(f"Extracting data of study ID: {row[study_id_column]}")
 
         report: str = str(row[report_column])
+        study_id: str = str(row[study_id_column])
         data = extract_report(report)
-        extracted_data.append(data)
+        extracted_data[study_id] = data
 
     return extracted_data
 
 
-def export_data(extracted_data: list[ExtractedData], db_file: str) -> None:
+def export_data(extracted_data: dict[str, ExtractedData], output_file: str) -> None:
     logging.info("Exporting data to SQLite database.")
+
+    items: list[dict[str, Any]] = []
+    for study_id, data in extracted_data.items():
+        item: dict[str, Any] = {"study_id": study_id}
+
+        item = (
+            item
+            | data.clinical_information.model_dump()
+            | data.indication.model_dump()
+            | data.findings.model_dump()
+        )
+
+        item["keywords"] = ", ".join(data.clinical_information.keywords)
+        item["clot_burden_score_calc"] = calc_cbs_score(data.findings)
+
+        items.append(item)
+
+    df = pd.DataFrame(items)
+    df.to_csv(output_file, index=False)
 
 
 def main():
@@ -441,13 +462,13 @@ def main():
     if not log_file:
         raise ValueError("LOG_FILE environment variable is not set.")
 
-    data_file = os.getenv("DATA_FILE")
-    if not data_file:
-        raise ValueError("DATA_FILE environment variable is not set.")
+    input_file = os.getenv("INPUT_FILE")
+    if not input_file:
+        raise ValueError("INPUT_FILE environment variable is not set.")
 
-    db_file = os.getenv("DB_FILE")
-    if not db_file:
-        raise ValueError("DB_FILE environment variable is not set.")
+    output_file = os.getenv("OUTPUT_FILE")
+    if not output_file:
+        raise ValueError("OUTPUT_FILE environment variable is not set.")
 
     study_id_column = os.getenv("STUDY_ID_COLUMN")
     if not study_id_column:
@@ -461,7 +482,7 @@ def main():
 
     logging.info("Loading data from CSV file.")
 
-    df = pd.read_csv(data_file)
+    df = pd.read_csv(input_file)
     if limit_reports is not None:
         df = df.head(limit_reports)
 
@@ -469,7 +490,7 @@ def main():
 
     extracted_data = extract_reports(df, study_id_column, report_column)
 
-    export_data(extracted_data, db_file)
+    export_data(extracted_data, output_file)
 
 
 if __name__ == "__main__":
