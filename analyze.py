@@ -14,7 +14,7 @@ logging.basicConfig(
     filemode="w",
     format="%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s",
     datefmt="%H:%M:%S",
-    level=logging.DEBUG,
+    level=logging.INFO,
 )
 
 logging.info("Extracting data from radiological reports.")
@@ -229,7 +229,7 @@ def get_field_value(study_id: str, report: str, field: str) -> str | None:
         if field in line:
             return line.split(":")[-1].strip()
 
-    logging.error(f"No field found with name '{field}'.")
+    logging.error(f"No field found with name: '{field}'")
 
 
 def validate_input(study_id: str, report: str) -> None:
@@ -240,7 +240,7 @@ def validate_input(study_id: str, report: str) -> None:
         logging.error(f"Invalid value for 'EKG-Synchronisation': {value}")
 
     value = get_field_value(study_id, report, "CT-Dichte Truncus pulmonalis (Standard)")
-    if value is not None and value != "-" and not re.fullmatch(r"\d+ HU", value):
+    if value is not None and value != "-" and not re.fullmatch(r"\d+(,\d+)? HU", value):
         logging.error(
             f"Invalid value for 'CT-Dichte Truncus pulmonalis (Standard)': {value}"
         )
@@ -291,6 +291,7 @@ def validate_input(study_id: str, report: str) -> None:
         value = get_field_value(study_id, report, main_branch)
         if value is not None and value not in [
             "",
+            "-",
             "Total okkludiert",
             "Partiell okkludiert",
         ]:
@@ -306,16 +307,13 @@ def validate_input(study_id: str, report: str) -> None:
         value = get_field_value(study_id, report, lobe)
         if value is not None and value not in [
             "",
+            "-",
             "Lappenarterie total okkludiert",
             "Lappenarterie partiell okkludiert",
             "Segmentarterie(n)",
             "Subsegmentarterie(n)",
         ]:
             logging.error(f"Invalid value for '{lobe}': {value}")
-
-
-def validate_data(data: ExtractedData) -> list[str] | None:
-    pass
 
 
 def calc_cbs_score(findings: Findings) -> float:
@@ -381,7 +379,7 @@ def calc_cbs_score(findings: Findings) -> float:
     return score
 
 
-def analyze_report(report: str) -> ExtractedData:
+def extract_data(report: str) -> ExtractedData:
     client = OpenAI()
     completion = client.beta.chat.completions.parse(
         model="gpt-4o",
@@ -407,7 +405,7 @@ def main():
     if limit_reports is not None:
         df = df.head(limit_reports)
 
-    for idx, row in track(
+    for _, row in track(
         df.iterrows(), total=df.shape[0], description="Validating reports ..."
     ):
         logging.info(f"Validating report of study.id: {row['study.id']}")
@@ -415,6 +413,15 @@ def main():
         study_id: str = str(row["study.id"])
         report: str = str(row["befund"])
         validate_input(study_id, report)
+
+    # for _, row in track(
+    #     df.iterrows(), total=df.shape[0], description="Extracting data ..."
+    # ):
+    #     logging.info(f"Extracting data of study.id: {row['study.id']}")
+
+    #     study_id: str = str(row["study.id"])
+    #     report: str = str(row["befund"])
+    #     extract_data(report)
 
 
 if __name__ == "__main__":
