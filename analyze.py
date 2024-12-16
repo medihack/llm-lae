@@ -9,21 +9,21 @@ import re
 import logging
 
 
-logging.basicConfig(
-    filename="./env/output.log",
-    filemode="w",
-    format="%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s",
-    datefmt="%H:%M:%S",
-    level=logging.INFO,
-)
-
-logging.info("Extracting data from radiological reports.")
-
 load_dotenv()
 
 SYSTEM_PROMPT: str = (
     "Extrahiere Daten aus folgendem strukturiertem radiologischem Befund:"
 )
+
+
+def setup_logging(log_file: str):
+    logging.basicConfig(
+        filename=log_file,
+        filemode="w",
+        format="%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s",
+        datefmt="%H:%M:%S",
+        level=logging.INFO,
+    )
 
 
 class ClinicalInformation(BaseModel):
@@ -396,31 +396,54 @@ def extract_data(report: str) -> ExtractedData:
 
 
 def main():
-    df = pd.read_csv("./env/input_data.csv")
+    log_file = os.getenv("LOG_FILE")
+    if not log_file:
+        raise ValueError("LOG_FILE environment variable is not set.")
+
+    data_file = os.getenv("DATA_FILE")
+    if not data_file:
+        raise ValueError("DATA_FILE environment variable is not set.")
 
     limit_reports: int | None = None
     if limit := os.getenv("LIMIT_REPORTS"):
         limit_reports = int(limit)
 
+    study_id_column = os.getenv("STUDY_ID_COLUMN")
+    if not study_id_column:
+        raise ValueError("STUDY_ID_COLUMN environment variable is not set.")
+
+    report_column = os.getenv("REPORT_COLUMN")
+    if not report_column:
+        raise ValueError("REPORT_COLUMN environment variable is not set.")
+
+    setup_logging(log_file)
+
+    logging.info("Loading data from CSV file.")
+
+    df = pd.read_csv(data_file)
     if limit_reports is not None:
         df = df.head(limit_reports)
 
-    for _, row in track(
-        df.iterrows(), total=df.shape[0], description="Validating reports ..."
-    ):
-        logging.info(f"Validating report of study.id: {row['study.id']}")
+    logging.info("Validating inputs of reports.")
 
-        study_id: str = str(row["study.id"])
-        report: str = str(row["befund"])
+    for _, row in track(
+        df.iterrows(), total=df.shape[0], description="Validating input of reports ..."
+    ):
+        logging.info(f"Validating report of study ID: {row[study_id_column]}")
+
+        study_id: str = str(row[study_id_column])
+        report: str = str(row[report_column])
         validate_input(study_id, report)
 
-    # for _, row in track(
-    #     df.iterrows(), total=df.shape[0], description="Extracting data ..."
-    # ):
-    #     logging.info(f"Extracting data of study.id: {row['study.id']}")
+    logging.info("Extracting data from reports.")
 
-    #     study_id: str = str(row["study.id"])
-    #     report: str = str(row["befund"])
+    # for _, row in track(
+    #     df.iterrows(), total=df.shape[0], description="Extracting data from reports ..."
+    # ):
+    #     logging.info(f"Extracting data of study ID: {row[study_id_column]}")
+
+    #     study_id: str = str(row[study_id_column])
+    #     report: str = str(row[report_column])
     #     extract_data(report)
 
 
