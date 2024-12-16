@@ -224,6 +224,69 @@ class ExtractedData(BaseModel):
     findings: Findings = Field(..., description="Daten extrahiert aus dem Befund.")
 
 
+def calc_cbs_score(findings: Findings) -> float:
+    score: float = 0
+
+    # Left lung
+    if findings.lae_main_branch_left == MainBranchOcclusion.TOTAL:
+        score += 20
+    elif findings.lae_main_branch_left == MainBranchOcclusion.PARTIAL:
+        score += 10
+    else:
+        if findings.lae_upper_lobe_left == LobeOcclusion.TOTAL:
+            score += 10
+        elif findings.lae_upper_lobe_left == LobeOcclusion.PARTIAL:
+            score += 5
+        elif findings.lae_upper_lobe_left == LobeOcclusion.SEGMENTAL:
+            score += 2.5
+        elif findings.lae_upper_lobe_left == LobeOcclusion.SUBSEGMENTAL:
+            score += 1
+
+        if findings.lae_lower_lobe_left == LobeOcclusion.TOTAL:
+            score += 10
+        elif findings.lae_lower_lobe_left == LobeOcclusion.PARTIAL:
+            score += 5
+        elif findings.lae_lower_lobe_left == LobeOcclusion.SEGMENTAL:
+            score += 2.5
+        elif findings.lae_lower_lobe_left == LobeOcclusion.SUBSEGMENTAL:
+            score += 1
+
+    # Right lung
+    if findings.lae_main_branch_right == MainBranchOcclusion.TOTAL:
+        score += 20
+    elif findings.lae_main_branch_right == MainBranchOcclusion.PARTIAL:
+        score += 10
+    else:
+        if findings.lae_upper_lobe_right == LobeOcclusion.TOTAL:
+            score += 6
+        elif findings.lae_upper_lobe_right == LobeOcclusion.PARTIAL:
+            score += 3
+        elif findings.lae_upper_lobe_right == LobeOcclusion.SEGMENTAL:
+            score += 1.5
+        elif findings.lae_upper_lobe_right == LobeOcclusion.SUBSEGMENTAL:
+            score += 1
+
+        if findings.lae_middle_lobe_right == LobeOcclusion.TOTAL:
+            score += 4
+        elif findings.lae_middle_lobe_right == LobeOcclusion.PARTIAL:
+            score += 2
+        elif findings.lae_middle_lobe_right == LobeOcclusion.SEGMENTAL:
+            score += 1
+        elif findings.lae_middle_lobe_right == LobeOcclusion.SUBSEGMENTAL:
+            score += 0.5
+
+        if findings.lae_lower_lobe_right == LobeOcclusion.TOTAL:
+            score += 10
+        elif findings.lae_lower_lobe_right == LobeOcclusion.PARTIAL:
+            score += 5
+        elif findings.lae_lower_lobe_right == LobeOcclusion.SEGMENTAL:
+            score += 2.5
+        elif findings.lae_lower_lobe_right == LobeOcclusion.SUBSEGMENTAL:
+            score += 1
+
+    return score
+
+
 def get_field_value(study_id: str, report: str, field: str) -> str | None:
     for line in report.split("\n"):
         if field in line:
@@ -232,7 +295,7 @@ def get_field_value(study_id: str, report: str, field: str) -> str | None:
     logging.error(f"No field found with name: '{field}'")
 
 
-def validate_input(study_id: str, report: str) -> None:
+def validate_report(report: str, study_id: str) -> None:
     """Validate the report with below options."""
 
     value = get_field_value(study_id, report, "EKG-Synchronisation")
@@ -316,70 +379,22 @@ def validate_input(study_id: str, report: str) -> None:
             logging.error(f"Invalid value for '{lobe}': {value}")
 
 
-def calc_cbs_score(findings: Findings) -> float:
-    score: float = 0
+def validate_reports(
+    df: pd.DataFrame, study_id_column: str, report_column: str
+) -> None:
+    logging.info("Validating inputs of reports.")
 
-    # Left lung
-    if findings.lae_main_branch_left == MainBranchOcclusion.TOTAL:
-        score += 20
-    elif findings.lae_main_branch_left == MainBranchOcclusion.PARTIAL:
-        score += 10
-    else:
-        if findings.lae_upper_lobe_left == LobeOcclusion.TOTAL:
-            score += 10
-        elif findings.lae_upper_lobe_left == LobeOcclusion.PARTIAL:
-            score += 5
-        elif findings.lae_upper_lobe_left == LobeOcclusion.SEGMENTAL:
-            score += 2.5
-        elif findings.lae_upper_lobe_left == LobeOcclusion.SUBSEGMENTAL:
-            score += 1
+    for _, row in track(
+        df.iterrows(), total=df.shape[0], description="Validating input of reports ..."
+    ):
+        logging.info(f"Validating report of study ID: {row[study_id_column]}")
 
-        if findings.lae_lower_lobe_left == LobeOcclusion.TOTAL:
-            score += 10
-        elif findings.lae_lower_lobe_left == LobeOcclusion.PARTIAL:
-            score += 5
-        elif findings.lae_lower_lobe_left == LobeOcclusion.SEGMENTAL:
-            score += 2.5
-        elif findings.lae_lower_lobe_left == LobeOcclusion.SUBSEGMENTAL:
-            score += 1
-
-    # Right lung
-    if findings.lae_main_branch_right == MainBranchOcclusion.TOTAL:
-        score += 20
-    elif findings.lae_main_branch_right == MainBranchOcclusion.PARTIAL:
-        score += 10
-    else:
-        if findings.lae_upper_lobe_right == LobeOcclusion.TOTAL:
-            score += 6
-        elif findings.lae_upper_lobe_right == LobeOcclusion.PARTIAL:
-            score += 3
-        elif findings.lae_upper_lobe_right == LobeOcclusion.SEGMENTAL:
-            score += 1.5
-        elif findings.lae_upper_lobe_right == LobeOcclusion.SUBSEGMENTAL:
-            score += 1
-
-        if findings.lae_middle_lobe_right == LobeOcclusion.TOTAL:
-            score += 4
-        elif findings.lae_middle_lobe_right == LobeOcclusion.PARTIAL:
-            score += 2
-        elif findings.lae_middle_lobe_right == LobeOcclusion.SEGMENTAL:
-            score += 1
-        elif findings.lae_middle_lobe_right == LobeOcclusion.SUBSEGMENTAL:
-            score += 0.5
-
-        if findings.lae_lower_lobe_right == LobeOcclusion.TOTAL:
-            score += 10
-        elif findings.lae_lower_lobe_right == LobeOcclusion.PARTIAL:
-            score += 5
-        elif findings.lae_lower_lobe_right == LobeOcclusion.SEGMENTAL:
-            score += 2.5
-        elif findings.lae_lower_lobe_right == LobeOcclusion.SUBSEGMENTAL:
-            score += 1
-
-    return score
+        report: str = str(row[report_column])
+        study_id: str = str(row[study_id_column])
+        validate_report(report, study_id)
 
 
-def extract_data(report: str) -> ExtractedData:
+def extract_report(report: str) -> ExtractedData:
     client = OpenAI()
     completion = client.beta.chat.completions.parse(
         model="gpt-4o",
@@ -395,7 +410,33 @@ def extract_data(report: str) -> ExtractedData:
     return extracted_data
 
 
+def extract_reports(
+    df: pd.DataFrame, study_id_column: str, report_column: str
+) -> list[ExtractedData]:
+    logging.info("Extracting data from reports.")
+
+    extracted_data = []
+    for _, row in track(
+        df.iterrows(), total=df.shape[0], description="Extracting data from reports ..."
+    ):
+        logging.info(f"Extracting data of study ID: {row[study_id_column]}")
+
+        report: str = str(row[report_column])
+        data = extract_report(report)
+        extracted_data.append(data)
+
+    return extracted_data
+
+
+def export_data(extracted_data: list[ExtractedData], db_file: str) -> None:
+    logging.info("Exporting data to SQLite database.")
+
+
 def main():
+    limit_reports: int | None = None
+    if limit := os.getenv("LIMIT_REPORTS"):
+        limit_reports = int(limit)
+
     log_file = os.getenv("LOG_FILE")
     if not log_file:
         raise ValueError("LOG_FILE environment variable is not set.")
@@ -404,9 +445,9 @@ def main():
     if not data_file:
         raise ValueError("DATA_FILE environment variable is not set.")
 
-    limit_reports: int | None = None
-    if limit := os.getenv("LIMIT_REPORTS"):
-        limit_reports = int(limit)
+    db_file = os.getenv("DB_FILE")
+    if not db_file:
+        raise ValueError("DB_FILE environment variable is not set.")
 
     study_id_column = os.getenv("STUDY_ID_COLUMN")
     if not study_id_column:
@@ -424,27 +465,11 @@ def main():
     if limit_reports is not None:
         df = df.head(limit_reports)
 
-    logging.info("Validating inputs of reports.")
+    validate_reports(df, study_id_column, report_column)
 
-    for _, row in track(
-        df.iterrows(), total=df.shape[0], description="Validating input of reports ..."
-    ):
-        logging.info(f"Validating report of study ID: {row[study_id_column]}")
+    extracted_data = extract_reports(df, study_id_column, report_column)
 
-        study_id: str = str(row[study_id_column])
-        report: str = str(row[report_column])
-        validate_input(study_id, report)
-
-    logging.info("Extracting data from reports.")
-
-    # for _, row in track(
-    #     df.iterrows(), total=df.shape[0], description="Extracting data from reports ..."
-    # ):
-    #     logging.info(f"Extracting data of study ID: {row[study_id_column]}")
-
-    #     study_id: str = str(row[study_id_column])
-    #     report: str = str(row[report_column])
-    #     extract_data(report)
+    export_data(extracted_data, db_file)
 
 
 if __name__ == "__main__":
