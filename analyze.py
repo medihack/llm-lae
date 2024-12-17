@@ -1,6 +1,6 @@
 from enum import Enum
 import os
-from typing import Any
+from typing import Any, TypedDict
 from pydantic import BaseModel, Field
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -15,6 +15,29 @@ load_dotenv()
 SYSTEM_PROMPT: str = (
     "Extrahiere Daten aus folgendem strukturiertem radiologischem Befund:"
 )
+
+
+class ErrorCode(Enum):
+    NO_ERROR = 0
+    MISSING_FIELD = 1
+    INVALID_VALUE = 2
+
+
+class InputValidation(TypedDict):
+    ecg_sync: ErrorCode
+    density_tr_pulmonalis: ErrorCode
+    artefact_score: ErrorCode
+    lae_presence: ErrorCode
+    lae_main_branch_right: ErrorCode
+    lae_upper_lobe_right: ErrorCode
+    lae_lower_lobe_right: ErrorCode
+    lae_middle_lobe_right: ErrorCode
+    lae_main_branch_left: ErrorCode
+    lae_upper_lobe_left: ErrorCode
+    lae_lower_lobe_left: ErrorCode
+    clot_burden_score: ErrorCode
+    perfusion_deficit: ErrorCode
+    rv_lv_quotient: ErrorCode
 
 
 class ClinicalInformation(BaseModel):
@@ -235,8 +258,9 @@ class DataAnalyzer:
         open_ai_model: str,
         limit_reports: int | None,
         log_file: str,
-        input_file: str,
-        output_file: str,
+        reports_file: str,
+        validations_file: str,
+        extracted_data_file: str,
         study_id_column: str,
         report_column: str,
     ) -> None:
@@ -244,8 +268,9 @@ class DataAnalyzer:
         self.open_ai_model = open_ai_model
         self.limit_reports = limit_reports
         self.log_file = log_file
-        self.input_file = input_file
-        self.output_file = output_file
+        self.reports_file = reports_file
+        self.validations_file = validations_file
+        self.extracted_data_file = extracted_data_file
         self.study_id_column = study_id_column
         self.report_column = report_column
 
@@ -256,51 +281,74 @@ class DataAnalyzer:
         logging.info(f"Using LLM model: {self.open_ai_model}")
 
         logging.info("Loading data from CSV file.")
-        df = pd.read_csv(self.input_file)
+        df = pd.read_csv(self.reports_file)
         if self.limit_reports is not None:
             df = df.head(self.limit_reports)
 
-        self.validate_reports(df, self.study_id_column, self.report_column)
-        extracted_data = self.extract_reports(
-            df, self.study_id_column, self.report_column
-        )
-        self.export_data(extracted_data, self.output_file)
+        validations = self.validate_reports(df)
+        self.export_validations(validations)
 
-    def validate_reports(
-        self, df: pd.DataFrame, study_id_column: str, report_column: str
-    ) -> None:
+        extracted_data = self.extract_reports(df)
+        self.export_extracted_data(extracted_data)
+
+    def validate_reports(self, df: pd.DataFrame) -> dict[str, InputValidation]:
         logging.info("Validating inputs of reports.")
 
+        validations: dict[str, InputValidation] = {}
         for _, row in track(
             df.iterrows(),
             total=df.shape[0],
             description="Validating input of reports ...",
         ):
-            logging.info(f"Validating report of study ID: {row[study_id_column]}")
+            logging.info(f"Validating report of study ID: {row[self.study_id_column]}")
 
-            report: str = str(row[report_column])
-            study_id: str = str(row[study_id_column])
-            self.validate_report(report, study_id)
+            report: str = str(row[self.report_column])
+            study_id: str = str(row[self.study_id_column])
+            validation = self.validate_report(report, study_id)
+            validations[study_id] = validation
 
-    def validate_report(self, report: str, study_id: str) -> None:
+        return validations
+
+    def validate_report(self, report: str, study_id: str) -> InputValidation:
         """Validate the report with below options."""
 
+        validation = InputValidation(
+            ecg_sync=ErrorCode.NO_ERROR,
+            density_tr_pulmonalis=ErrorCode.NO_ERROR,
+            artefact_score=ErrorCode.NO_ERROR,
+            lae_presence=ErrorCode.NO_ERROR,
+            lae_main_branch_right=ErrorCode.NO_ERROR,
+            lae_upper_lobe_right=ErrorCode.NO_ERROR,
+            lae_lower_lobe_right=ErrorCode.NO_ERROR,
+            lae_middle_lobe_right=ErrorCode.NO_ERROR,
+            lae_main_branch_left=ErrorCode.NO_ERROR,
+            lae_upper_lobe_left=ErrorCode.NO_ERROR,
+            lae_lower_lobe_left=ErrorCode.NO_ERROR,
+            clot_burden_score=ErrorCode.NO_ERROR,
+            perfusion_deficit=ErrorCode.NO_ERROR,
+            rv_lv_quotient=ErrorCode.NO_ERROR,
+        )
+
         value = self.get_field_value(report, "EKG-Synchronisation")
-        if value is not None and value not in ["", "Nein", "Ja"]:
+        if value is None:
+            validation["ecg_sync"] = ErrorCode.MISSING_FIELD
+        elif value not in ["", "Nein", "Ja"]:
             logging.error(f"Invalid value for 'EKG-Synchronisation': {value}")
+            validation["ecg_sync"] = ErrorCode.INVALID_VALUE
 
         value = self.get_field_value(report, "CT-Dichte Truncus pulmonalis (Standard)")
-        if (
-            value is not None
-            and value != "-"
-            and not re.fullmatch(r"\d+(,\d+)? HU", value)
-        ):
+        if value is None:
+            validation["density_tr_pulmonalis"] = ErrorCode.MISSING_FIELD
+        elif value != "-" and not re.fullmatch(r"\d+(,\d+)? HU", value):
             logging.error(
                 f"Invalid value for 'CT-Dichte Truncus pulmonalis (Standard)': {value}"
             )
+            validation["density_tr_pulmonalis"] = ErrorCode.INVALID_VALUE
 
         value = self.get_field_value(report, "Artefakt-Score (0-5)")
-        if value is not None and value not in [
+        if value is None:
+            validation["artefact_score"] = ErrorCode.MISSING_FIELD
+        elif value not in [
             "",
             "0 (keine Artefakte)",
             "1",
@@ -310,9 +358,12 @@ class DataAnalyzer:
             "5 (nicht beurteilbar)",
         ]:
             logging.error(f"Invalid value for 'Artefakt-Score (0-5)': {value}")
+            validation["artefact_score"] = ErrorCode.INVALID_VALUE
 
         value = self.get_field_value(report, "Nachweis einer Lungenarterienembolie")
-        if value is not None and value not in [
+        if value is None:
+            validation["lae_presence"] = ErrorCode.MISSING_FIELD
+        elif value not in [
             "Nein",
             "Ja",
             "Verdacht auf",
@@ -321,48 +372,64 @@ class DataAnalyzer:
             logging.error(
                 f"Invalid value for 'Nachweis einer Lungenarterienembolie': {value}"
             )
+            validation["lae_presence"] = ErrorCode.INVALID_VALUE
 
         value = self.get_field_value(
             report, "Heidelberg Clot Burden Score (CBS, PMID: 34581626)"
         )
-        if value is not None and (
-            not re.fullmatch(r"\d+(,\d+)?", value)
-            or not (0 <= float(value.replace(",", ".")) <= 40)
+        if value is None:
+            validation["clot_burden_score"] = ErrorCode.MISSING_FIELD
+        elif not re.fullmatch(r"\d+(,\d+)?", value) or not (
+            0 <= float(value.replace(",", ".")) <= 40
         ):
             logging.error(
                 f"Invalid value for 'Heidelberg Clot Burden Score (CBS, PMID: 34581626)': {value}"
             )
+            validation["clot_burden_score"] = ErrorCode.INVALID_VALUE
 
         value = self.get_field_value(report, "Perfusionsausfälle (DE-CT)")
-        if value is not None and value not in ["-", "Keine", "<25%", "≥25%"]:
+        if value is None:
+            validation["perfusion_deficit"] = ErrorCode.MISSING_FIELD
+        elif value not in ["-", "Keine", "<25%", "≥25%", "=25%"]:
             logging.error(f"Invalid value for 'Perfusionsausfälle (DE-CT)': {value}")
+            validation["perfusion_deficit"] = ErrorCode.INVALID_VALUE
 
         value = self.get_field_value(report, "RV/LV-Quotient")
-        if value is not None and value not in ["-", "<1", "≥1"]:
+        if value is None:
+            validation["rv_lv_quotient"] = ErrorCode.MISSING_FIELD
+        elif value not in ["-", "<1", "≥1", "=1"]:
             logging.error(f"Invalid value for 'RV/LV-Quotient': {value}")
+            validation["rv_lv_quotient"] = ErrorCode.INVALID_VALUE
 
-        for main_branch in [
-            "Rechts Pulmonalhauptarterie",
-            "Links Pulmonalhauptarterie",
-        ]:
+        main_branches = {
+            "Rechts Pulmonalhauptarterie": "lae_main_branch_right",
+            "Links Pulmonalhauptarterie": "lae_main_branch_left",
+        }
+        for main_branch in main_branches:
             value = self.get_field_value(report, main_branch)
-            if value is not None and value not in [
+            if value is None:
+                validation[main_branches[main_branch]] = ErrorCode.MISSING_FIELD
+            elif value not in [
                 "",
                 "-",
                 "Total okkludiert",
                 "Partiell okkludiert",
             ]:
                 logging.error(f"Invalid value for '{main_branch}': {value}")
+                validation[main_branches[main_branch]] = ErrorCode.INVALID_VALUE
 
-        for lobe in [
-            "Rechts Oberlappen",
-            "Mittellappen",
-            "Rechts Unterlappen",
-            "Links Oberlappen",
-            "Links Unterlappen",
-        ]:
+        lobes = {
+            "Rechts Oberlappen": "lae_upper_lobe_right",
+            "Rechts Unterlappen": "lae_lower_lobe_right",
+            "Mittellappen": "lae_middle_lobe_right",
+            "Links Oberlappen": "lae_upper_lobe_left",
+            "Links Unterlappen": "lae_lower_lobe_left",
+        }
+        for lobe in lobes:
             value = self.get_field_value(report, lobe)
-            if value is not None and value not in [
+            if value is None:
+                validation[lobes[lobe]] = ErrorCode.MISSING_FIELD
+            elif value not in [
                 "",
                 "-",
                 "Lappenarterie total okkludiert",
@@ -371,17 +438,45 @@ class DataAnalyzer:
                 "Subsegmentarterie(n)",
             ]:
                 logging.error(f"Invalid value for '{lobe}': {value}")
+                validation[lobes[lobe]] = ErrorCode.INVALID_VALUE
+
+        # If all main branches and lobes where missing then this is not an error
+        # and set all to NO_ERROR
+        if all(
+            validation[main_branch] == ErrorCode.MISSING_FIELD
+            for main_branch in main_branches.values()
+        ) and all(
+            validation[lobe] == ErrorCode.MISSING_FIELD for lobe in lobes.values()
+        ):
+            for main_branch in main_branches.values():
+                validation[main_branch] = ErrorCode.NO_ERROR
+            for lobe in lobes.values():
+                validation[lobe] = ErrorCode.NO_ERROR
+
+        return validation
 
     def get_field_value(self, report: str, field: str) -> str | None:
         for line in report.split("\n"):
-            if field in line:
+            if f"{field}:" in line:
                 return line.split(":")[-1].strip()
 
         logging.error(f"No field found with name: '{field}'")
 
-    def extract_reports(
-        self, df: pd.DataFrame, study_id_column: str, report_column: str
-    ) -> dict[str, ExtractedData]:
+    def export_validations(self, validations: dict[str, InputValidation]) -> None:
+        logging.info(
+            f"Exporting input validations to CSV file '{self.validations_file}'."
+        )
+
+        items: list[dict[str, Any]] = []
+        for study_id, validation in validations.items():
+            item: dict[str, Any] = {"study_id": study_id}
+            item = item | validation
+            items.append(item)
+
+        df = pd.DataFrame(items)
+        df.to_csv(self.validations_file, index=False)
+
+    def extract_reports(self, df: pd.DataFrame) -> dict[str, ExtractedData]:
         logging.info("Extracting data from reports.")
 
         extracted_data: dict[str, ExtractedData] = {}
@@ -390,10 +485,10 @@ class DataAnalyzer:
             total=df.shape[0],
             description="Extracting data from reports ...",
         ):
-            logging.info(f"Extracting data of study ID: {row[study_id_column]}")
+            logging.info(f"Extracting data of study ID: {row[self.study_id_column]}")
 
-            report: str = str(row[report_column])
-            study_id: str = str(row[study_id_column])
+            report: str = str(row[self.report_column])
+            study_id: str = str(row[self.study_id_column])
             data = self.extract_report(report)
             extracted_data[study_id] = data
 
@@ -413,10 +508,10 @@ class DataAnalyzer:
         assert extracted_data
         return extracted_data
 
-    def export_data(
-        self, extracted_data: dict[str, ExtractedData], output_file: str
-    ) -> None:
-        logging.info("Exporting data to SQLite database.")
+    def export_extracted_data(self, extracted_data: dict[str, ExtractedData]) -> None:
+        logging.info(
+            f"Exporting extracted data to CSV file '{self.extracted_data_file}'."
+        )
 
         items: list[dict[str, Any]] = []
         for study_id, data in extracted_data.items():
@@ -435,7 +530,7 @@ class DataAnalyzer:
             items.append(item)
 
         df = pd.DataFrame(items)
-        df.to_csv(output_file, index=False)
+        df.to_csv(self.extracted_data_file, index=False)
 
     def calc_cbs_score(self, findings: Findings) -> float:
         score: float = 0
@@ -515,13 +610,17 @@ def main():
     if not log_file:
         raise ValueError("LOG_FILE environment variable is not set.")
 
-    input_file = os.getenv("INPUT_FILE")
-    if not input_file:
-        raise ValueError("INPUT_FILE environment variable is not set.")
+    reports_file = os.getenv("REPORTS_FILE")
+    if not reports_file:
+        raise ValueError("REPORTS_FILE environment variable is not set.")
 
-    output_file = os.getenv("OUTPUT_FILE")
-    if not output_file:
-        raise ValueError("OUTPUT_FILE environment variable is not set.")
+    validations_file = os.getenv("VALIDATIONS_FILE")
+    if not validations_file:
+        raise ValueError("VALIDATIONS_FILE environment variable is not set.")
+
+    extracted_data_file = os.getenv("EXTRACTED_DATA_FILE")
+    if not extracted_data_file:
+        raise ValueError("EXTRACTED_DATA_FILE environment variable is not set.")
 
     study_id_column = os.getenv("STUDY_ID_COLUMN")
     if not study_id_column:
@@ -538,8 +637,9 @@ def main():
         open_ai_model=open_ai_model,
         limit_reports=limit_reports,
         log_file=log_file,
-        input_file=input_file,
-        output_file=output_file,
+        reports_file=reports_file,
+        validations_file=validations_file,
+        extracted_data_file=extracted_data_file,
         study_id_column=study_id_column,
         report_column=report_column,
     )
