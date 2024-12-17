@@ -17,16 +17,6 @@ SYSTEM_PROMPT: str = (
 )
 
 
-def setup_logging(log_file: str):
-    logging.basicConfig(
-        filename=log_file,
-        filemode="w",
-        format="%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s",
-        datefmt="%H:%M:%S",
-        level=logging.INFO,
-    )
-
-
 class ClinicalInformation(BaseModel):
     keywords: list[str] = Field(
         ...,
@@ -225,235 +215,298 @@ class ExtractedData(BaseModel):
     findings: Findings = Field(..., description="Daten extrahiert aus dem Befund.")
 
 
-def calc_cbs_score(findings: Findings) -> float:
-    score: float = 0
+def setup_logging(log_file: str):
+    logging.getLogger("openai").setLevel(logging.ERROR)
+    logging.getLogger("httpx").setLevel(logging.ERROR)
 
-    # Left lung
-    if findings.lae_main_branch_left == MainBranchOcclusion.TOTAL:
-        score += 20
-    elif findings.lae_main_branch_left == MainBranchOcclusion.PARTIAL:
-        score += 10
-    else:
-        if findings.lae_upper_lobe_left == LobeOcclusion.TOTAL:
-            score += 10
-        elif findings.lae_upper_lobe_left == LobeOcclusion.PARTIAL:
-            score += 5
-        elif findings.lae_upper_lobe_left == LobeOcclusion.SEGMENTAL:
-            score += 2.5
-        elif findings.lae_upper_lobe_left == LobeOcclusion.SUBSEGMENTAL:
-            score += 1
-
-        if findings.lae_lower_lobe_left == LobeOcclusion.TOTAL:
-            score += 10
-        elif findings.lae_lower_lobe_left == LobeOcclusion.PARTIAL:
-            score += 5
-        elif findings.lae_lower_lobe_left == LobeOcclusion.SEGMENTAL:
-            score += 2.5
-        elif findings.lae_lower_lobe_left == LobeOcclusion.SUBSEGMENTAL:
-            score += 1
-
-    # Right lung
-    if findings.lae_main_branch_right == MainBranchOcclusion.TOTAL:
-        score += 20
-    elif findings.lae_main_branch_right == MainBranchOcclusion.PARTIAL:
-        score += 10
-    else:
-        if findings.lae_upper_lobe_right == LobeOcclusion.TOTAL:
-            score += 6
-        elif findings.lae_upper_lobe_right == LobeOcclusion.PARTIAL:
-            score += 3
-        elif findings.lae_upper_lobe_right == LobeOcclusion.SEGMENTAL:
-            score += 1.5
-        elif findings.lae_upper_lobe_right == LobeOcclusion.SUBSEGMENTAL:
-            score += 1
-
-        if findings.lae_middle_lobe_right == LobeOcclusion.TOTAL:
-            score += 4
-        elif findings.lae_middle_lobe_right == LobeOcclusion.PARTIAL:
-            score += 2
-        elif findings.lae_middle_lobe_right == LobeOcclusion.SEGMENTAL:
-            score += 1
-        elif findings.lae_middle_lobe_right == LobeOcclusion.SUBSEGMENTAL:
-            score += 0.5
-
-        if findings.lae_lower_lobe_right == LobeOcclusion.TOTAL:
-            score += 10
-        elif findings.lae_lower_lobe_right == LobeOcclusion.PARTIAL:
-            score += 5
-        elif findings.lae_lower_lobe_right == LobeOcclusion.SEGMENTAL:
-            score += 2.5
-        elif findings.lae_lower_lobe_right == LobeOcclusion.SUBSEGMENTAL:
-            score += 1
-
-    return score
-
-
-def get_field_value(study_id: str, report: str, field: str) -> str | None:
-    for line in report.split("\n"):
-        if field in line:
-            return line.split(":")[-1].strip()
-
-    logging.error(f"No field found with name: '{field}'")
-
-
-def validate_report(report: str, study_id: str) -> None:
-    """Validate the report with below options."""
-
-    value = get_field_value(study_id, report, "EKG-Synchronisation")
-    if value is not None and value not in ["", "Nein", "Ja"]:
-        logging.error(f"Invalid value for 'EKG-Synchronisation': {value}")
-
-    value = get_field_value(study_id, report, "CT-Dichte Truncus pulmonalis (Standard)")
-    if value is not None and value != "-" and not re.fullmatch(r"\d+(,\d+)? HU", value):
-        logging.error(
-            f"Invalid value for 'CT-Dichte Truncus pulmonalis (Standard)': {value}"
-        )
-
-    value = get_field_value(study_id, report, "Artefakt-Score (0-5)")
-    if value is not None and value not in [
-        "",
-        "0 (keine Artefakte)",
-        "1",
-        "2",
-        "3",
-        "4",
-        "5 (nicht beurteilbar)",
-    ]:
-        logging.error(f"Invalid value for 'Artefakt-Score (0-5)': {value}")
-
-    value = get_field_value(study_id, report, "Nachweis einer Lungenarterienembolie")
-    if value is not None and value not in [
-        "Nein",
-        "Ja",
-        "Verdacht auf",
-        "Nicht beurteilbar",
-    ]:
-        logging.error(
-            f"Invalid value for 'Nachweis einer Lungenarterienembolie': {value}"
-        )
-
-    value = get_field_value(
-        study_id, report, "Heidelberg Clot Burden Score (CBS, PMID: 34581626)"
-    )
-    if value is not None and (
-        not re.fullmatch(r"\d+(,\d+)?", value)
-        or not (0 <= float(value.replace(",", ".")) <= 40)
-    ):
-        logging.error(
-            f"Invalid value for 'Heidelberg Clot Burden Score (CBS, PMID: 34581626)': {value}"
-        )
-
-    value = get_field_value(study_id, report, "Perfusionsausfälle (DE-CT)")
-    if value is not None and value not in ["-", "Keine", "<25%", "≥25%"]:
-        logging.error(f"Invalid value for 'Perfusionsausfälle (DE-CT)': {value}")
-
-    value = get_field_value(study_id, report, "RV/LV-Quotient")
-    if value is not None and value not in ["-", "<1", "≥1"]:
-        logging.error(f"Invalid value for 'RV/LV-Quotient': {value}")
-
-    for main_branch in ["Rechts Pulmonalhauptarterie", "Links Pulmonalhauptarterie"]:
-        value = get_field_value(study_id, report, main_branch)
-        if value is not None and value not in [
-            "",
-            "-",
-            "Total okkludiert",
-            "Partiell okkludiert",
-        ]:
-            logging.error(f"Invalid value for '{main_branch}': {value}")
-
-    for lobe in [
-        "Rechts Oberlappen",
-        "Mittellappen",
-        "Rechts Unterlappen",
-        "Links Oberlappen",
-        "Links Unterlappen",
-    ]:
-        value = get_field_value(study_id, report, lobe)
-        if value is not None and value not in [
-            "",
-            "-",
-            "Lappenarterie total okkludiert",
-            "Lappenarterie partiell okkludiert",
-            "Segmentarterie(n)",
-            "Subsegmentarterie(n)",
-        ]:
-            logging.error(f"Invalid value for '{lobe}': {value}")
-
-
-def validate_reports(
-    df: pd.DataFrame, study_id_column: str, report_column: str
-) -> None:
-    logging.info("Validating inputs of reports.")
-
-    for _, row in track(
-        df.iterrows(), total=df.shape[0], description="Validating input of reports ..."
-    ):
-        logging.info(f"Validating report of study ID: {row[study_id_column]}")
-
-        report: str = str(row[report_column])
-        study_id: str = str(row[study_id_column])
-        validate_report(report, study_id)
-
-
-def extract_report(report: str) -> ExtractedData:
-    client = OpenAI()
-    completion = client.beta.chat.completions.parse(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": report},
-        ],
-        response_format=ExtractedData,
+    logging.basicConfig(
+        filename=log_file,
+        filemode="w",
+        format="%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s",
+        datefmt="%H:%M:%S",
+        level=logging.INFO,
     )
 
-    extracted_data = completion.choices[0].message.parsed
-    assert extracted_data
-    return extracted_data
 
+class DataAnalyzer:
+    def __init__(
+        self,
+        open_ai_base_url: str | None,
+        open_ai_model: str,
+        limit_reports: int | None,
+        log_file: str,
+        input_file: str,
+        output_file: str,
+        study_id_column: str,
+        report_column: str,
+    ) -> None:
+        self.open_ai_base_url = open_ai_base_url
+        self.open_ai_model = open_ai_model
+        self.limit_reports = limit_reports
+        self.log_file = log_file
+        self.input_file = input_file
+        self.output_file = output_file
+        self.study_id_column = study_id_column
+        self.report_column = report_column
 
-def extract_reports(
-    df: pd.DataFrame, study_id_column: str, report_column: str
-) -> dict[str, ExtractedData]:
-    logging.info("Extracting data from reports.")
+        self.client = OpenAI(base_url=self.open_ai_base_url)
 
-    extracted_data: dict[str, ExtractedData] = {}
-    for _, row in track(
-        df.iterrows(), total=df.shape[0], description="Extracting data from reports ..."
-    ):
-        logging.info(f"Extracting data of study ID: {row[study_id_column]}")
+    def analyze(self) -> None:
+        logging.info("Starting data analysis.")
+        logging.info(f"Using LLM model: {self.open_ai_model}")
 
-        report: str = str(row[report_column])
-        study_id: str = str(row[study_id_column])
-        data = extract_report(report)
-        extracted_data[study_id] = data
+        logging.info("Loading data from CSV file.")
+        df = pd.read_csv(self.input_file)
+        if self.limit_reports is not None:
+            df = df.head(self.limit_reports)
 
-    return extracted_data
+        self.validate_reports(df, self.study_id_column, self.report_column)
+        extracted_data = self.extract_reports(
+            df, self.study_id_column, self.report_column
+        )
+        self.export_data(extracted_data, self.output_file)
 
+    def validate_reports(
+        self, df: pd.DataFrame, study_id_column: str, report_column: str
+    ) -> None:
+        logging.info("Validating inputs of reports.")
 
-def export_data(extracted_data: dict[str, ExtractedData], output_file: str) -> None:
-    logging.info("Exporting data to SQLite database.")
+        for _, row in track(
+            df.iterrows(),
+            total=df.shape[0],
+            description="Validating input of reports ...",
+        ):
+            logging.info(f"Validating report of study ID: {row[study_id_column]}")
 
-    items: list[dict[str, Any]] = []
-    for study_id, data in extracted_data.items():
-        item: dict[str, Any] = {"study_id": study_id}
+            report: str = str(row[report_column])
+            study_id: str = str(row[study_id_column])
+            self.validate_report(report, study_id)
 
-        item = (
-            item
-            | data.clinical_information.model_dump()
-            | data.indication.model_dump()
-            | data.findings.model_dump()
+    def validate_report(self, report: str, study_id: str) -> None:
+        """Validate the report with below options."""
+
+        value = self.get_field_value(report, "EKG-Synchronisation")
+        if value is not None and value not in ["", "Nein", "Ja"]:
+            logging.error(f"Invalid value for 'EKG-Synchronisation': {value}")
+
+        value = self.get_field_value(report, "CT-Dichte Truncus pulmonalis (Standard)")
+        if (
+            value is not None
+            and value != "-"
+            and not re.fullmatch(r"\d+(,\d+)? HU", value)
+        ):
+            logging.error(
+                f"Invalid value for 'CT-Dichte Truncus pulmonalis (Standard)': {value}"
+            )
+
+        value = self.get_field_value(report, "Artefakt-Score (0-5)")
+        if value is not None and value not in [
+            "",
+            "0 (keine Artefakte)",
+            "1",
+            "2",
+            "3",
+            "4",
+            "5 (nicht beurteilbar)",
+        ]:
+            logging.error(f"Invalid value for 'Artefakt-Score (0-5)': {value}")
+
+        value = self.get_field_value(report, "Nachweis einer Lungenarterienembolie")
+        if value is not None and value not in [
+            "Nein",
+            "Ja",
+            "Verdacht auf",
+            "Nicht beurteilbar",
+        ]:
+            logging.error(
+                f"Invalid value for 'Nachweis einer Lungenarterienembolie': {value}"
+            )
+
+        value = self.get_field_value(
+            report, "Heidelberg Clot Burden Score (CBS, PMID: 34581626)"
+        )
+        if value is not None and (
+            not re.fullmatch(r"\d+(,\d+)?", value)
+            or not (0 <= float(value.replace(",", ".")) <= 40)
+        ):
+            logging.error(
+                f"Invalid value for 'Heidelberg Clot Burden Score (CBS, PMID: 34581626)': {value}"
+            )
+
+        value = self.get_field_value(report, "Perfusionsausfälle (DE-CT)")
+        if value is not None and value not in ["-", "Keine", "<25%", "≥25%"]:
+            logging.error(f"Invalid value for 'Perfusionsausfälle (DE-CT)': {value}")
+
+        value = self.get_field_value(report, "RV/LV-Quotient")
+        if value is not None and value not in ["-", "<1", "≥1"]:
+            logging.error(f"Invalid value for 'RV/LV-Quotient': {value}")
+
+        for main_branch in [
+            "Rechts Pulmonalhauptarterie",
+            "Links Pulmonalhauptarterie",
+        ]:
+            value = self.get_field_value(report, main_branch)
+            if value is not None and value not in [
+                "",
+                "-",
+                "Total okkludiert",
+                "Partiell okkludiert",
+            ]:
+                logging.error(f"Invalid value for '{main_branch}': {value}")
+
+        for lobe in [
+            "Rechts Oberlappen",
+            "Mittellappen",
+            "Rechts Unterlappen",
+            "Links Oberlappen",
+            "Links Unterlappen",
+        ]:
+            value = self.get_field_value(report, lobe)
+            if value is not None and value not in [
+                "",
+                "-",
+                "Lappenarterie total okkludiert",
+                "Lappenarterie partiell okkludiert",
+                "Segmentarterie(n)",
+                "Subsegmentarterie(n)",
+            ]:
+                logging.error(f"Invalid value for '{lobe}': {value}")
+
+    def get_field_value(self, report: str, field: str) -> str | None:
+        for line in report.split("\n"):
+            if field in line:
+                return line.split(":")[-1].strip()
+
+        logging.error(f"No field found with name: '{field}'")
+
+    def extract_reports(
+        self, df: pd.DataFrame, study_id_column: str, report_column: str
+    ) -> dict[str, ExtractedData]:
+        logging.info("Extracting data from reports.")
+
+        extracted_data: dict[str, ExtractedData] = {}
+        for _, row in track(
+            df.iterrows(),
+            total=df.shape[0],
+            description="Extracting data from reports ...",
+        ):
+            logging.info(f"Extracting data of study ID: {row[study_id_column]}")
+
+            report: str = str(row[report_column])
+            study_id: str = str(row[study_id_column])
+            data = self.extract_report(report)
+            extracted_data[study_id] = data
+
+        return extracted_data
+
+    def extract_report(self, report: str) -> ExtractedData:
+        completion = self.client.beta.chat.completions.parse(
+            model=self.open_ai_model,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": report},
+            ],
+            response_format=ExtractedData,
         )
 
-        item["keywords"] = ", ".join(data.clinical_information.keywords)
-        item["clot_burden_score_calc"] = calc_cbs_score(data.findings)
+        extracted_data = completion.choices[0].message.parsed
+        assert extracted_data
+        return extracted_data
 
-        items.append(item)
+    def export_data(
+        self, extracted_data: dict[str, ExtractedData], output_file: str
+    ) -> None:
+        logging.info("Exporting data to SQLite database.")
 
-    df = pd.DataFrame(items)
-    df.to_csv(output_file, index=False)
+        items: list[dict[str, Any]] = []
+        for study_id, data in extracted_data.items():
+            item: dict[str, Any] = {"study_id": study_id}
+
+            item = (
+                item
+                | data.clinical_information.model_dump()
+                | data.indication.model_dump()
+                | data.findings.model_dump()
+            )
+
+            item["keywords"] = ", ".join(data.clinical_information.keywords)
+            item["clot_burden_score_calc"] = self.calc_cbs_score(data.findings)
+
+            items.append(item)
+
+        df = pd.DataFrame(items)
+        df.to_csv(output_file, index=False)
+
+    def calc_cbs_score(self, findings: Findings) -> float:
+        score: float = 0
+
+        # Left lung
+        if findings.lae_main_branch_left == MainBranchOcclusion.TOTAL:
+            score += 20
+        elif findings.lae_main_branch_left == MainBranchOcclusion.PARTIAL:
+            score += 10
+        else:
+            if findings.lae_upper_lobe_left == LobeOcclusion.TOTAL:
+                score += 10
+            elif findings.lae_upper_lobe_left == LobeOcclusion.PARTIAL:
+                score += 5
+            elif findings.lae_upper_lobe_left == LobeOcclusion.SEGMENTAL:
+                score += 2.5
+            elif findings.lae_upper_lobe_left == LobeOcclusion.SUBSEGMENTAL:
+                score += 1
+
+            if findings.lae_lower_lobe_left == LobeOcclusion.TOTAL:
+                score += 10
+            elif findings.lae_lower_lobe_left == LobeOcclusion.PARTIAL:
+                score += 5
+            elif findings.lae_lower_lobe_left == LobeOcclusion.SEGMENTAL:
+                score += 2.5
+            elif findings.lae_lower_lobe_left == LobeOcclusion.SUBSEGMENTAL:
+                score += 1
+
+        # Right lung
+        if findings.lae_main_branch_right == MainBranchOcclusion.TOTAL:
+            score += 20
+        elif findings.lae_main_branch_right == MainBranchOcclusion.PARTIAL:
+            score += 10
+        else:
+            if findings.lae_upper_lobe_right == LobeOcclusion.TOTAL:
+                score += 6
+            elif findings.lae_upper_lobe_right == LobeOcclusion.PARTIAL:
+                score += 3
+            elif findings.lae_upper_lobe_right == LobeOcclusion.SEGMENTAL:
+                score += 1.5
+            elif findings.lae_upper_lobe_right == LobeOcclusion.SUBSEGMENTAL:
+                score += 1
+
+            if findings.lae_middle_lobe_right == LobeOcclusion.TOTAL:
+                score += 4
+            elif findings.lae_middle_lobe_right == LobeOcclusion.PARTIAL:
+                score += 2
+            elif findings.lae_middle_lobe_right == LobeOcclusion.SEGMENTAL:
+                score += 1
+            elif findings.lae_middle_lobe_right == LobeOcclusion.SUBSEGMENTAL:
+                score += 0.5
+
+            if findings.lae_lower_lobe_right == LobeOcclusion.TOTAL:
+                score += 10
+            elif findings.lae_lower_lobe_right == LobeOcclusion.PARTIAL:
+                score += 5
+            elif findings.lae_lower_lobe_right == LobeOcclusion.SEGMENTAL:
+                score += 2.5
+            elif findings.lae_lower_lobe_right == LobeOcclusion.SUBSEGMENTAL:
+                score += 1
+
+        return score
 
 
 def main():
+    open_ai_base_url = os.getenv("OPENAI_BASE_URL")
+
+    open_ai_model = os.getenv("OPENAI_MODEL")
+    if not open_ai_model:
+        raise ValueError("OPENAI_MODEL environment variable is not set.")
+
     limit_reports: int | None = None
     if limit := os.getenv("LIMIT_REPORTS"):
         limit_reports = int(limit)
@@ -480,17 +533,17 @@ def main():
 
     setup_logging(log_file)
 
-    logging.info("Loading data from CSV file.")
-
-    df = pd.read_csv(input_file)
-    if limit_reports is not None:
-        df = df.head(limit_reports)
-
-    validate_reports(df, study_id_column, report_column)
-
-    extracted_data = extract_reports(df, study_id_column, report_column)
-
-    export_data(extracted_data, output_file)
+    analyzer = DataAnalyzer(
+        open_ai_base_url=open_ai_base_url,
+        open_ai_model=open_ai_model,
+        limit_reports=limit_reports,
+        log_file=log_file,
+        input_file=input_file,
+        output_file=output_file,
+        study_id_column=study_id_column,
+        report_column=report_column,
+    )
+    analyzer.analyze()
 
 
 if __name__ == "__main__":
