@@ -1,20 +1,21 @@
-from enum import Enum
-import os
-from typing import Any, TypedDict
-from pydantic import BaseModel, Field
-from openai import OpenAI
-from dotenv import load_dotenv
-from rich.progress import track
-import pandas as pd
-import re
+import argparse
 import logging
+import os
+import re
+from enum import Enum
+from typing import Any, TypedDict
 
+import pandas as pd
+from dotenv import load_dotenv
+from openai import OpenAI
+from pydantic import BaseModel, Field
+from rich.progress import track
 
 load_dotenv()
 
-SYSTEM_PROMPT: str = (
-    "Extrahiere Daten aus folgendem strukturiertem radiologischem Befund:"
-)
+SYSTEM_PROMPT = """
+Extrahiere Daten aus folgendem radiologischem Befund im JSON Format:
+"""
 
 
 class ErrorCode(Enum):
@@ -254,9 +255,10 @@ def setup_logging(log_file: str):
 class DataAnalyzer:
     def __init__(
         self,
+        study_ids: list[str] | None,
+        limit_reports: int | None,
         open_ai_base_url: str | None,
         open_ai_model: str,
-        limit_reports: int | None,
         log_file: str,
         reports_file: str,
         validations_file: str,
@@ -264,9 +266,10 @@ class DataAnalyzer:
         study_id_column: str,
         report_column: str,
     ) -> None:
+        self.study_ids = study_ids
+        self.limit_reports = limit_reports
         self.open_ai_base_url = open_ai_base_url
         self.open_ai_model = open_ai_model
-        self.limit_reports = limit_reports
         self.log_file = log_file
         self.reports_file = reports_file
         self.validations_file = validations_file
@@ -282,7 +285,9 @@ class DataAnalyzer:
 
         logging.info("Loading data from CSV file.")
         df = pd.read_csv(self.reports_file)
-        if self.limit_reports is not None:
+        if self.study_ids is not None:
+            df = pd.DataFrame(df[df[self.study_id_column].isin(self.study_ids)])
+        elif isinstance(self.limit_reports, int):
             df = df.head(self.limit_reports)
 
         validations = self.validate_reports(df)
@@ -596,15 +601,24 @@ class DataAnalyzer:
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-l", "--limit", type=int)
+    parser.add_argument("-s", "--study-id", action="append")
+    args = parser.parse_args()
+
+    limit_reports: int | None = None
+    if args.limit is not None:
+        limit_reports = args.limit
+
+    study_ids: list[str] | None = None
+    if args.study_id:
+        study_ids = args.study_id
+
     open_ai_base_url = os.getenv("OPENAI_BASE_URL")
 
     open_ai_model = os.getenv("OPENAI_MODEL")
     if not open_ai_model:
         raise ValueError("OPENAI_MODEL environment variable is not set.")
-
-    limit_reports: int | None = None
-    if limit := os.getenv("LIMIT_REPORTS"):
-        limit_reports = int(limit)
 
     log_file = os.getenv("LOG_FILE")
     if not log_file:
@@ -633,9 +647,10 @@ def main():
     setup_logging(log_file)
 
     analyzer = DataAnalyzer(
+        limit_reports=limit_reports,
+        study_ids=study_ids,
         open_ai_base_url=open_ai_base_url,
         open_ai_model=open_ai_model,
-        limit_reports=limit_reports,
         log_file=log_file,
         reports_file=reports_file,
         validations_file=validations_file,
