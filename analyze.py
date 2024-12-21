@@ -15,14 +15,19 @@ from rich import inspect
 load_dotenv()
 
 SYSTEM_PROMPT = """
-Du bist ein KI-Modell, das radiologische Befunde aus strukturierten Texten extrahiert und in ein standardisiertes JSON-Format überführt.
+Du bist ein KI-Modell, das Daten aus radiologischen Befunden extrahiert und in ein standardisiertes JSON-Format überführt.
 
 Ordne die Informationen aus dem Bericht den entsprechenden JSON-Feldern zu. Nutze die unten definierten Variablennamen für die Zuordnung.
 
 JSON-Formatbeschreibung:
 1. **Einträge hinter 'Klinische Angaben' (clinical_information):**
 - keywords: Eine Liste relevanter Schlüsselbegriffe, entnommen aus den Abschnitten 'Klinische Angaben' und 'Fragestellung'.
-- morbidity: Deine Einschätzung zur Erkrankungslast des Patienten auf einer Likert-Skala von 1 bis 5. Entscheide anhand deiner vergebenen Schlagwörter, ob der Patient wenig oder sehr krank ist. Folgende Werte sind erlaubt: 1 = 'Sehr leichte Erkrankungslast', 2 = 'Leichte Erkrankungslast', 3 = 'Mittelschwere Erkrankungslast', 4 = 'Schwere Erkrankungslast', 5 = 'Sehr schwere Erkrankungslast'.
+- morbidity: Deine Einschätzung zur Erkrankungslast des Patienten auf einer Likert-Skala von 1 bis 5. Entscheide anhand deiner vergebenen Schlagwörter, ob der Patient wenig oder sehr krank ist. Folgende Werte sind erlaubt:
+    - 1 = 'Sehr leichte Erkrankungslast'
+    - 2 = 'Leichte Erkrankungslast'
+    - 3 = 'Mittelschwere Erkrankungslast'
+    - 4 = 'Schwere Erkrankungslast'
+    - 5 = 'Sehr schwere Erkrankungslast'
 - symptom_duration: Dauer der klinischen Symptome in Stunden oder 'null', wenn keine Angabe zur Symtpomdauer gemacht wird.
 - deep_vein_thrombosis: 'true', wenn eine tiefe Beinvenenthrombose TVT erwähnt wird, sonst 'false'.
 - dyspnea: 'true', wenn eine Dyspnoe erwähnt wird, sonst 'false'.
@@ -49,9 +54,9 @@ JSON-Formatbeschreibung:
 - artefact_score: Wert hinter 'Artefakt-Score (0 bis 5)' oder 'null', wenn keine Angabe vorhanden.
 - previous_examination: Wert hinter 'Letzte Voruntersuchung'. 'true', wenn eine Voraufnahme zum Vergleich angegeben ist, sonst 'false'.
 - lae_presence: Wert hinter 'Nachweis einer Lungenarterienembolie'. Werte: 'Ja', 'Nein', 'Verdacht auf', 'Nicht beurteilbar'.
-- clot_burden_score: Wert hinter 'Heidelberg Clot Burden Score (CBS, PMID: 34581626)' als Dezimalzahl oder null, wenn keine Angabe vorhanden ist.
+- clot_burden_score: Wert hinter 'Heidelberg Clot Burden Score (CBS, PMID: 34581626)' als Dezimalzahl oder 'null', wenn keine Angabe vorhanden ist.
 - perfusion_deficit: Wert hinter 'Perfusionsausfälle (DE-CT)'. Mögliche Werte sind: Keine, <25% (kleiner 25 Prozent), ≥25% (größer oder gleich 25 Prozent, =25% (exakt gleich 25 Prozent und '-' (Bindestrich). Mache folgende Zuordnungen:
-    - Bei '-' gib 'NA' an.
+    - Bei '-' gib 'null' an.
     - Bei 'Keine' gib 'Keine' an.
     - Bei '<25%' gib '< 25%' an.
     - Bei '≥25%' gib '≥ 25%' an.
@@ -80,6 +85,8 @@ JSON-Formatbeschreibung:
 - bone_pathology: 'true', wenn Knochenpathologien im Befundabschnitt beschrieben werden, sonst 'false'.
 
 Arbeite exakt nach diesen Vorgaben und gib die Ergebnisse im JSON-Format zurück.
+
+Radiologischer Befund:
 """
 
 
