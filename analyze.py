@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from pydantic import BaseModel
 from rich.progress import track
+from rich import inspect
 
 load_dotenv()
 
@@ -201,6 +202,7 @@ class DataAnalyzer:
         self,
         study_ids: list[str] | None,
         limit_reports: int | None,
+        debug: bool,
         open_ai_base_url: str | None,
         open_ai_model: str,
         log_file: str,
@@ -212,6 +214,7 @@ class DataAnalyzer:
     ) -> None:
         self.study_ids = study_ids
         self.limit_reports = limit_reports
+        self.debug = debug
         self.open_ai_base_url = open_ai_base_url
         self.open_ai_model = open_ai_model
         self.log_file = log_file
@@ -453,6 +456,15 @@ class DataAnalyzer:
             response_format=ExtractedData,
         )
 
+        if self.debug:
+            inspect(completion)
+
+        logging.info(
+            f"Total tokens: {completion.usage.total_tokens}, "
+            f"prompt tokens {completion.usage.prompt_tokens}, "
+            f"completion tokens {completion.usage.completion_tokens}"
+        )
+
         extracted_data = completion.choices[0].message.parsed
         assert extracted_data
         return extracted_data
@@ -548,6 +560,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-l", "--limit", type=int)
     parser.add_argument("-s", "--study-id", action="append")
+    parser.add_argument("-d", "--debug", action="store_true")
+
     args = parser.parse_args()
 
     limit_reports: int | None = None
@@ -557,6 +571,10 @@ def main():
     study_ids: list[str] | None = None
     if args.study_id:
         study_ids = args.study_id
+
+    debug = False
+    if args.debug:
+        debug = True
 
     open_ai_base_url = os.getenv("OPENAI_BASE_URL")
 
@@ -593,6 +611,7 @@ def main():
     analyzer = DataAnalyzer(
         limit_reports=limit_reports,
         study_ids=study_ids,
+        debug=debug,
         open_ai_base_url=open_ai_base_url,
         open_ai_model=open_ai_model,
         log_file=log_file,
