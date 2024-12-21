@@ -56,7 +56,7 @@ JSON-Formatbeschreibung:
 - lae_presence: Wert hinter 'Nachweis einer Lungenarterienembolie'. Werte: 'Ja', 'Nein', 'Verdacht auf', 'Nicht beurteilbar'.
 - clot_burden_score: Wert hinter 'Heidelberg Clot Burden Score (CBS, PMID: 34581626)' als Dezimalzahl oder 'null', wenn keine Angabe vorhanden ist.
 - perfusion_deficit: Wert hinter 'Perfusionsausfälle (DE-CT)'. Mögliche Werte sind: Keine, <25% (kleiner 25 Prozent), ≥25% (größer oder gleich 25 Prozent, =25% (exakt gleich 25 Prozent und '-' (Bindestrich). Mache folgende Zuordnungen:
-    - Bei '-' gib 'null' an.
+    - Bei '-' gib 'NA' an.
     - Bei 'Keine' gib 'Keine' an.
     - Bei '<25%' gib '< 25%' an.
     - Bei '≥25%' gib '≥ 25%' an.
