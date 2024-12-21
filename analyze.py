@@ -22,13 +22,13 @@ Ordne die Informationen aus dem Bericht den entsprechenden JSON-Feldern zu. Nutz
 JSON-Formatbeschreibung:
 1. **Einträge hinter 'Klinische Angaben' (clinical_information):**
 - keywords: Eine Liste relevanter Schlüsselbegriffe, entnommen aus den Abschnitten 'Klinische Angaben' und 'Fragestellung'.
-- morbidity: Deine Einschätzung zur Erkrankungslast des Patienten auf einer Likert-Skala von 1 bis 5. Entscheide anhand deiner vergebenen Schlagwörter, ob der Patient wenig oder sehr krank ist. Folgende Werte sind erlaubt:
-    - 1 = 'Sehr leichte Erkrankungslast'
-    - 2 = 'Leichte Erkrankungslast'
-    - 3 = 'Mittelschwere Erkrankungslast'
-    - 4 = 'Schwere Erkrankungslast'
-    - 5 = 'Sehr schwere Erkrankungslast'
-- symptom_duration: Dauer der klinischen Symptome in Stunden oder 'null', wenn keine Angabe zur Symtpomdauer gemacht wird.
+- morbidity: Deine Einschätzung zur der Erkrankungslast des Patienten auf einer Likert-Skala von 1 bis 5. Entscheide anhand der klinischen Angaben:
+    - 1 für sehr leichte Erkrankungslast
+    - 2 für leichte Erkrankungslast
+    - 3 für mittelschwere Erkrankungslast
+    - 4 für schwere Erkrankungslast
+    - 5 für sehr schwere Erkrankungslast
+- symptom_duration: Dauer der klinischen Symptome in Stunden oder 'null', wenn keine Angabe zur Symptomdauer gemacht wird.
 - deep_vein_thrombosis: 'true', wenn eine tiefe Beinvenenthrombose TVT erwähnt wird, sonst 'false'.
 - dyspnea: 'true', wenn eine Dyspnoe erwähnt wird, sonst 'false'.
 - tachycardia: 'true', wenn eine Tachykardie erwähnt wird, sonst 'false'.
