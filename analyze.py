@@ -470,10 +470,12 @@ class DataAnalyzer:
         if self.debug:
             inspect(completion)
 
+        usage = completion.usage
+        assert usage
         logging.info(
-            f"Total tokens: {completion.usage.total_tokens}, "
-            f"prompt tokens {completion.usage.prompt_tokens}, "
-            f"completion tokens {completion.usage.completion_tokens}"
+            f"Total tokens: {usage.total_tokens}, "
+            f"prompt tokens {usage.prompt_tokens}, "
+            f"completion tokens {usage.completion_tokens}"
         )
 
         extracted_data = completion.choices[0].message.parsed
