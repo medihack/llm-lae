@@ -8,13 +8,68 @@ from typing import Any, TypedDict
 import pandas as pd
 from dotenv import load_dotenv
 from openai import OpenAI
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from rich.progress import track
 
 load_dotenv()
 
 SYSTEM_PROMPT = """
-Extrahiere Daten aus folgendem radiologischem Befund im JSON Format:
+Du bist ein KI-Modell, das radiologische Befunde aus strukturierten Texten extrahiert und in ein standardisiertes JSON-Format überführt.
+
+Ordne die Informationen aus dem Bericht den entsprechenden JSON-Feldern zu. Nutze die unten definierten Variablennamen für die Zuordnung.
+
+JSON-Formatbeschreibung:
+1. **Einträge hinter 'Klinische Angaben' (clinical_information):**
+- keywords: Eine Liste relevanter Schlüsselbegriffe, entnommen aus den Abschnitten 'Klinische Angaben' und 'Fragestellung'.
+- morbidity: Erkrankungslast auf einer Skala von 1 bis 5 (1 = sehr leicht, 5 = sehr schwer).
+- symptom_duration: Dauer der klinischen Symptome in Stunden oder 'null', wenn keine Angabe vorhanden ist.
+- `deep_vein_thrombosis`: 'true', wenn TVT erwähnt wird, sonst 'false'.
+- `dyspnea`: 'true', wenn Dyspnoe erwähnt wird, sonst 'false'.
+- `tachycardia`: 'true', wenn Tachykardie erwähnt wird, sonst 'false'.
+- `pO2_reduction`: 'true', wenn eine pO2-Reduktion erwähnt wird, sonst 'false'
+- `pO2_percentage`: pO2-Wert als Ganzzahl oder 'null', wenn keine Angabe vorhanden.
+- `troponin_elevated`: 'true', wenn ein Troponin-Wert erwähnt wird, sonst 'false'.
+- `troponin_value`: Troponin-Wert als Dezimalzahl oder 'null', wenn keine Angabe vorhanden.
+- `nt_pro_bnp_elevated`: 'true', wenn ein NT-proBNP-Wert erwähnt wird, sonst 'false'.
+- `nt_pro_bnp_value`: NT-proBNP-Wert als Dezimalzahl oder 'null', wenn keine Angabe vorhanden.
+- `d_dimers_elevated`: 'true', wenn D-Dimere erwähnt werden, sonst 'false'.
+- `d_dimers_value`: D-Dimere-Wert als Dezimalzahl oder 'null', wenn keine Angabe vorhanden.
+
+2. **Einträge hinter 'Fragestellung' (indication):**\n
+- `inflammation_question`: 'true', wenn nach entzündlicher Lungenerkrankung gefragt wird, sonst 'false'.
+- `lung_question`: 'true', wenn nach anderen Lungenpathologien gefragt wird, sonst 'false'.
+- `aorta_question`: 'true', wenn nach Erkrankungen der Aorta gefragt wird, sonst 'false'.
+- `cardiac_question`: 'true', wenn nach Herzerkrankungen gefragt wird, sonst 'false'.
+- `triple_rule_out_question`: 'true', wenn nach Triple-Rule-Out gefragt wird, sonst 'false'.
+
+3. **Befunde (findings) zur '» Lungenarterienembolie':**
+- `ecg_sync`: Wert hinter 'EKG-Synchronisation'. 'true', wenn EKG-Synchronisation durchgeführt wurde, sonst 'false'.
+- `density_tr_pulmonalis`: Wert hinter 'CT-Dichte Truncus pulmonalis (Standard)' als Ganzzahl oder 'null', wenn keine Angabe vorhanden.
+- `artefact_score`: Wert hinter 'Artefakt-Score (0 bis 5)' oder 'null', wenn keine Angabe vorhanden.
+- `previous_examination`: Wert hinter 'Letzte Voruntersuchung'. 'true', wenn eine Voraufnahme zum Vergleich angegeben ist, sonst 'false'.
+- `lae_presence`: Wert hinter 'Nachweis einer Lungenarterienembolie'. Werte: 'Ja', 'Nein', 'Verdacht auf', 'Nicht beurteilbar'.
+- clot_burden_score: Wert hinter 'Heidelberg Clot Burden Score (CBS, PMID: 34581626)' als Dezimalzahl oder null, wenn keine Angabe vorhanden ist.
+- perfusion_deficit: Wert hinter 'Perfusionsausfälle (DE-CT)'. Mögliche Werte sind: 'Keine', '<25%', '=25%', '≥25%' und '-'.
+- rv_lv_quotient: Wert hinter 'RV/LV-Quotient'. Mögliche Werte sind: <1 (kleiner als 1), =1 (gleich 1), ≥1 (größer oder gleich 1), und None (kein Wert vorhanden oder nicht angegeben). Werte, die gleich oder größer als 1 sind, können zusammengefasst werden zu ≥ 1. None zeigt an, dass keine Information vorliegt.
+
+4. **Befunde (findings) zur '» Thrombuslast (proximalster Embolus)':**\n
+- lae_main_branch_right: Wert hinter 'Rechts Pulmonalhauptarterie', oder 'Keine Okklusion', falls nicht erwähnt. Mögliche Werte: 'Keine Okklusion', 'Totale Okklusion', 'Partielle Okklusion'.
+- lae_upper_lobe_right: Wert hinter 'Rechts Oberlappen', oder 'Keine Okklusion', falls nicht erwähnt. Mögliche Werte: 'Keine Okklusion', 'Totale Okklusion', 'Partielle Okklusion', 'Segmentale Okklusion', 'Subsegmentale Okklusion'.
+- lae_middle_lobe_right: Wert hinter 'Mittellappen', oder 'Keine Okklusion', falls nicht erwähnt. Mögliche Werte: 'Keine Okklusion', 'Totale Okklusion', 'Partielle Okklusion', 'Segmentale Okklusion', 'Subsegmentale Okklusion'.
+- lae_lower_lobe_right: Wert hinter 'Rechts Unterlappen', oder 'Keine Okklusion', falls nicht erwähnt. Mögliche Werte: 'Keine Okklusion', 'Totale Okklusion', 'Partielle Okklusion', 'Segmentale Okklusion', 'Subsegmentale Okklusion'.\n
+- lae_main_branch_left: Wert hinter 'Links Pulmonalhauptarterie', oder 'Keine Okklusion', falls nicht erwähnt. Mögliche Werte: 'Keine Okklusion', 'Totale Okklusion', 'Partielle Okklusion'.
+- lae_upper_lobe_left: Wert hinter 'Links Oberlappen', oder 'Keine Okklusion', falls nicht erwähnt. Mögliche Werte: 'Keine Okklusion', 'Totale Okklusion', 'Partielle Okklusion', 'Segmentale Okklusion', 'Subsegmentale Okklusion'.
+- lae_lower_lobe_left: Wert hinter 'Links Unterlappen', oder 'Keine Okklusion', falls nicht erwähnt. Mögliche Werte: 'Keine Okklusion', 'Totale Okklusion', 'Partielle Okklusion', 'Segmentale Okklusion', 'Subsegmentale Okklusion'.
+
+5. **Andere Befunde (other findings):**
+- `inflammation`: 'true', wenn Entzündungen im Befundabschnitt beschrieben werden, sonst 'false'.
+- `congestion`: 'true', wenn Stauungen im Befundabschnitt beschrieben werden, sonst 'false'.
+- `suspect_finding`: 'true', wenn suspekte Läsionen oder Tumore im Befundabschnitt beschrieben werden, sonst 'false'.
+- `heart_pathology`: 'true', wenn Herzerkrankungen im Befundabschnitt beschrieben werden, sonst 'false'.
+- `vascular_pathology`: 'true', wenn Gefäßerkrankungen im Befundabschnitt beschrieben werden, sonst 'false'.
+- `bone_pathology`: 'true', wenn Knochenpathologien im Befundabschnitt beschrieben werden, sonst 'false'.
+
+Arbeite exakt nach diesen Vorgaben und gib die Ergebnisse im JSON-Format zurück.
 """
 
 
@@ -42,93 +97,39 @@ class InputValidation(TypedDict):
 
 
 class ClinicalInformation(BaseModel):
-    keywords: list[str] = Field(
-        ...,
-        description="Was sind medizinisch relevante Schlagworte welche die klinischen Angaben oder "
-        "die Fragestellung beschreiben? Fasse möglichst Begriffe zu Erkrankungsgruppen zusammen.",
-    )
-    morbidity: int = Field(
-        ...,
-        description="Entscheide anhand der klinischen Angaben die Morbidität des Patienten. "
-        "Nutze dazu die Likert-Skala: "
-        "1 = Neben der Frage nach LAE kein Hinweis auf eine Grunderkrankung, "
-        "2 = Leichte Erkrankungslast, "
-        "3 = Mittelschwere Erkrankungslast, "
-        "4 = Schwere Erkrankungslast, "
-        "5 = Sehr schwere Erkrankungslast",
-    )
-    symptom_duration: int | None = Field(
-        ...,
-        description="Wie lange bestehen die Symptome bereits (in Stunden)? "
-        "Falls keine Angabe dazu vorhanden ist, dann mit 'None' antworten.",
-    )
-    deep_vein_thrombosis: bool = Field(
-        ..., description="Wurde eine Tiefe Beinvenenthrombose (TVT) angegeben?"
-    )
-    dyspnea: bool = Field(..., description="Ist eine Dyspnoe angegeben?")
-    tachycardia: bool = Field(..., description="Ist eine Tachykardie angegeben?")
-    pO2_reduction: bool = Field(..., description="Ist eine pO2-Reduktion angegeben?")
-    pO2_percentage: int | None = Field(
-        ...,
-        description="Git es Informationen zum pO2-Wert? "
-        "Falls ja, bitte den Wert eintragen. "
-        "Falls keine Angabe dazu vorhanden ist, dann mit 'None' antworten.",
-    )
-    troponin_elevated: bool = Field(
-        ..., description="Ist ein erhöhter Troponin-Wert (Trop/TNT) angegeben?"
-    )
-    troponin_value: float | None = Field(
-        ...,
-        description="Ist ein Troponin-Wert (Trop/TNT) angegeben? "
-        "Falls ja, bitte den Wert eintragen. "
-        "Falls keine Angabe dazu vorhanden ist, dann mit 'None' antworten.",
-    )
-    nt_pro_bnp_elevated: bool | None = Field(
-        ..., description="Ist ein erhöhter NT-proBNP-Wert angegeben? "
-    )
-    nt_pro_bnp_value: float | None = Field(
-        ...,
-        description="Ist ein NT-proBNP-Wert angegeben? "
-        "Falls ja, bitte den Wert eintragen. "
-        "Falls keine Angabe dazu vorhanden ist, dann mit 'None' antworten.",
-    )
-    d_dimers_elevated: bool = Field(..., description="Sind D-Dimere erhöht angegeben?")
-    d_dimers_value: float | None = Field(
-        ...,
-        description="Sind D-Dimere angegeben? "
-        "Falls ja, bitte den Wert eintragen. "
-        "Falls keine Angabe dazu vorhanden ist, dann mit 'None' antworten.",
-    )
+    keywords: list[str]
+    morbidity: int
+    symptom_duration: int | None
+    deep_vein_thrombosis: bool
+    dyspnea: bool
+    tachycardia: bool
+    pO2_reduction: bool
+    pO2_percentage: int | None
+    troponin_elevated: bool
+    troponin_value: float | None
+    nt_pro_bnp_elevated: bool
+    nt_pro_bnp_value: float | None
+    d_dimers_elevated: bool
+    d_dimers_value: float | None
 
 
 class Indication(BaseModel):
-    inflammation_question: bool = Field(
-        ...,
-        description="Gibt es eine Frage nach entzündlicher Lungenerkrankung in der Fragestellung?",
-    )
-    lung_question: bool = Field(
-        ...,
-        description="Gibt es eine Frage nach einer anderen Lungenpathologie außer LAE oder "
-        "Entzündung in der Fragestellung?",
-    )
-    aorta_question: bool = Field(
-        ...,
-        description="Gibt es eine Frage nach Erkrankung der Aorta in der Fragestellung?",
-    )
-    cardiac_question: bool = Field(
-        ...,
-        description="Gibt es eine Frage nach Erkrankung des Herzens in der Fragestellung?",
-    )
-    triple_rule_out_question: bool = Field(
-        ...,
-        description="Gibt es eine Frage nach Triple-Rule-Out in der Fragestellung?",
-    )
+    inflammation_question: bool
+    lung_question: bool
+    aorta_question: bool
+    cardiac_question: bool
+    triple_rule_out_question: bool
 
 
 class PerfusionDeficit(str, Enum):
-    NONE = "Kein Perfusionsausfall"
+    NONE = "Keine"
     LT_25 = "< 25%"
     GE_25 = ">= 25%"
+
+
+class RightHeartQuotient(str, Enum):
+    LT_1 = "< 1"
+    GE_1 = ">= 1"
 
 
 class LaePresence(str, Enum):
@@ -153,90 +154,33 @@ class LobeOcclusion(str, Enum):
 
 
 class Findings(BaseModel):
-    ecg_sync: bool = Field(
-        ..., description="Wurde das CT mit EKG-Synchronisation durchgeführt?"
-    )
-    density_tr_pulmonalis: int | None = Field(
-        ...,
-        description="Wie ist der angegebene Dichtegrad des Truncus pulmonalis? "
-        "Angabe in Hounsfield Einheiten (HE/HU). "
-        "Falls keine Angabe dazu vorhanden ist, dann mit 'None' antworten.",
-    )
-    artefact_score: int | None = Field(
-        ...,
-        description="Was ist der angegebene Grad von Bewegungsartefakten? "
-        "Falls keine Angabe dazu vorhanden ist, dann mit None antworten.",
-    )
-    previous_examination: bool = Field(
-        ..., description="Ist eine Voraufnahme zum Vergleich angegeben?"
-    )
-    lae_presence: LaePresence = Field(
-        ..., description="Wurde eine Lungenarterienembolie (LAE) gefunden?"
-    )
-    lae_main_branch_right: MainBranchOcclusion = Field(
-        ..., description="Wurde eine LAE im Hauptstamm rechts gefunden?"
-    )
-    lae_upper_lobe_right: LobeOcclusion = Field(
-        ..., description="Wurde eine LAE im Oberlappen rechts gefunden?"
-    )
-    lae_lower_lobe_right: LobeOcclusion = Field(
-        ..., description="Wurde eine LAE im Unterlappen rechts gefunden?"
-    )
-    lae_middle_lobe_right: LobeOcclusion = Field(
-        ..., description="Wurde eine LAE im Mittellappen rechts gefunden?"
-    )
-    lae_main_branch_left: MainBranchOcclusion = Field(
-        ..., description="Wurde eine LAE im Hauptstamm links gefunden?"
-    )
-    lae_upper_lobe_left: LobeOcclusion = Field(
-        ..., description="Wurde eine LAE im Oberlappen links gefunden?"
-    )
-    lae_lower_lobe_left: LobeOcclusion = Field(
-        ..., description="Wurde eine LAE im Unterlappen links gefunden?"
-    )
-    # Valid values 0-40
-    clot_burden_score: float | None = Field(
-        ...,
-        description="Wie hoch ist der Thrombuslastgrad beschrieben "
-        "(Heidelberg Clot Burden Score)? "
-        "Falls keine Angabe dazu vorhanden ist, dann mit None antworten.",
-    )
-    perfusion_deficit: PerfusionDeficit = Field(
-        ...,
-        description="Welche Perfusionsausfälle (DE-CT) sind beschrieben? "
-        "Falls keine Angabe dazu vorhanden ist, dann mit 'None' antworten.",
-    )
-    rv_lv_quotient: bool | None = Field(
-        ...,
-        description="Ist RV/LV-Quotient >= 1? "
-        "Falls keine Angabe dazu vorhanden ist, dann mit 'None' antworten.",
-    )
-    inflammation: bool = Field(
-        ..., description="Ist eine Entzündung im Befund beschrieben?"
-    )
-    congestion: bool = Field(..., description="Ist eine Stauung im Befund beschrieben?")
-    suspect_finding: bool = Field(
-        ..., description="Ist eine suspekte Läsion oder Tumor im Befund beschrieben?"
-    )
-    heart_pathology: bool = Field(
-        ..., description="Ist eine Herzerkrankung im Befund beschrieben?"
-    )
-    vascular_pathology: bool = Field(
-        ..., description="Ist eine Gefäßerkrankung im Befund beschrieben?"
-    )
-    bone_pathology: bool = Field(
-        ..., description="Ist eine Knochenpathologie im Befund beschrieben?"
-    )
+    ecg_sync: bool
+    density_tr_pulmonalis: int | None
+    artefact_score: int | None
+    previous_examination: bool
+    lae_presence: LaePresence
+    lae_main_branch_right: MainBranchOcclusion
+    lae_upper_lobe_right: LobeOcclusion
+    lae_lower_lobe_right: LobeOcclusion
+    lae_middle_lobe_right: LobeOcclusion
+    lae_main_branch_left: MainBranchOcclusion
+    lae_upper_lobe_left: LobeOcclusion
+    lae_lower_lobe_left: LobeOcclusion
+    clot_burden_score: float | None
+    perfusion_deficit: PerfusionDeficit | None
+    rv_lv_quotient: RightHeartQuotient | None
+    inflammation: bool
+    congestion: bool
+    suspect_finding: bool
+    heart_pathology: bool
+    vascular_pathology: bool
+    bone_pathology: bool
 
 
 class ExtractedData(BaseModel):
-    clinical_information: ClinicalInformation = Field(
-        ..., description="Daten extrahiert aus den klinischen Angaben."
-    )
-    indication: Indication = Field(
-        ..., description="Daten extrahiert aus der Fragestellung."
-    )
-    findings: Findings = Field(..., description="Daten extrahiert aus dem Befund.")
+    clinical_information: ClinicalInformation
+    indication: Indication
+    findings: Findings
 
 
 def setup_logging(log_file: str):
