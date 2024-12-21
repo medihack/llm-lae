@@ -22,19 +22,19 @@ Ordne die Informationen aus dem Bericht den entsprechenden JSON-Feldern zu. Nutz
 JSON-Formatbeschreibung:
 1. **Einträge hinter 'Klinische Angaben' (clinical_information):**
 - keywords: Eine Liste relevanter Schlüsselbegriffe, entnommen aus den Abschnitten 'Klinische Angaben' und 'Fragestellung'.
-- morbidity: Erkrankungslast auf einer Skala von 1 bis 5 (1 = sehr leicht, 5 = sehr schwer).
-- symptom_duration: Dauer der klinischen Symptome in Stunden oder 'null', wenn keine Angabe vorhanden ist.
-- deep_vein_thrombosis: 'true', wenn TVT erwähnt wird, sonst 'false'.
-- dyspnea: 'true', wenn Dyspnoe erwähnt wird, sonst 'false'.
-- tachycardia: 'true', wenn Tachykardie erwähnt wird, sonst 'false'.
-- pO2_reduction: 'true', wenn eine pO2-Reduktion erwähnt wird, sonst 'false'
-- pO2_percentage: pO2-Wert als Ganzzahl oder 'null', wenn keine Angabe vorhanden.
-- troponin_elevated: 'true', wenn ein Troponin-Wert erwähnt wird, sonst 'false'.
-- troponin_value: Troponin-Wert als Dezimalzahl oder 'null', wenn keine Angabe vorhanden.
+- morbidity: Deine Einschätzung zur Erkrankungslast des Patienten auf einer Likert-Skala von 1 bis 5. Entscheide anhand deiner vergebenen Schlagwörter, ob der Patient wenig oder sehr krank ist. Folgende Werte sind erlaubt: 1 = 'Sehr leichte Erkrankungslast', 2 = 'Leichte Erkrankungslast', 3 = 'Mittelschwere Erkrankungslast', 4 = 'Schwere Erkrankungslast', 5 = 'Sehr schwere Erkrankungslast'.
+- symptom_duration: Dauer der klinischen Symptome in Stunden oder 'null', wenn keine Angabe zur Symtpomdauer gemacht wird.
+- deep_vein_thrombosis: 'true', wenn eine tiefe Beinvenenthrombose TVT erwähnt wird, sonst 'false'.
+- dyspnea: 'true', wenn eine Dyspnoe erwähnt wird, sonst 'false'.
+- tachycardia: 'true', wenn eine Tachykardie erwähnt wird, sonst 'false'.
+- pO2_reduction: 'true', wenn eine pO2-Reduktion erwähnt wird, sonst 'false'.
+- pO2_percentage: pO2-Wert als Ganzzahl oder 'null', wenn keine Angabe zum pO2 gemacht wird.
+- troponin_elevated: 'true', wenn explizit ein Troponin (TNT)-Wert erwähnt wird, sonst 'false'.
+- troponin_value: Troponin (TNT)-Wert als Dezimalzahl oder 'null', wenn keine Angabe zum TNT gemacht wird.
 - nt_pro_bnp_elevated: 'true', wenn ein NT-proBNP-Wert erwähnt wird, sonst 'false'.
-- nt_pro_bnp_value: NT-proBNP-Wert als Dezimalzahl oder 'null', wenn keine Angabe vorhanden.
+- nt_pro_bnp_value: NT-proBNP-Wert als Dezimalzahl oder 'null', wenn keine Angabe zum NT-proBNP gemacht wird.
 - d_dimers_elevated: 'true', wenn D-Dimere erwähnt werden, sonst 'false'.
-- d_dimers_value: D-Dimere-Wert als Dezimalzahl oder 'null', wenn keine Angabe vorhanden.
+- d_dimers_value: D-Dimere-Wert als Dezimalzahl oder 'null', wenn keine Angabe zu den D-Dimeren gemacht wird.
 
 2. **Einträge hinter 'Fragestellung' (indication):**
 - inflammation_question`: 'true', wenn nach entzündlicher Lungenerkrankung gefragt wird, sonst 'false'.
@@ -50,8 +50,17 @@ JSON-Formatbeschreibung:
 - previous_examination: Wert hinter 'Letzte Voruntersuchung'. 'true', wenn eine Voraufnahme zum Vergleich angegeben ist, sonst 'false'.
 - lae_presence: Wert hinter 'Nachweis einer Lungenarterienembolie'. Werte: 'Ja', 'Nein', 'Verdacht auf', 'Nicht beurteilbar'.
 - clot_burden_score: Wert hinter 'Heidelberg Clot Burden Score (CBS, PMID: 34581626)' als Dezimalzahl oder null, wenn keine Angabe vorhanden ist.
-- perfusion_deficit: Wert hinter 'Perfusionsausfälle (DE-CT)'. Mögliche Werte sind: Keine, <25% (kleiner 25 Prozent), ≥25% (größer oder gleich 25 Prozent, =25% (exakt gleich 25 Prozent, musst du auch als ≥25% werten) und '-' (Bindestrich). Bei '-' oder fehlenden Angaben gib 'null' an.
-- rv_lv_quotient: Wert hinter 'RV/LV-Quotient'. Mögliche Werte sind: <1 (kleiner als 1), ≥1 (größer oder gleich 1), =1 (exakt gleich 1, musst du auch als ≥1 werten) und '-' (Bindestrich). Bei '-' oder fehlenden Angaben gib 'null' an.
+- perfusion_deficit: Wert hinter 'Perfusionsausfälle (DE-CT)'. Mögliche Werte sind: Keine, <25% (kleiner 25 Prozent), ≥25% (größer oder gleich 25 Prozent, =25% (exakt gleich 25 Prozent und '-' (Bindestrich). Mache folgende Zuordnungen:
+    - Bei '-' gib 'NA' an.
+    - Bei 'Keine' gib 'Keine' an.
+    - Bei '<25%' gib '< 25%' an.
+    - Bei '≥25%' gib '≥ 25%' an.
+    - Bei '=25%' gib '≥ 25%' an.
+- rv_lv_quotient: Wert hinter 'RV/LV-Quotient'. Mögliche Werte sind: <1 (kleiner als 1), ≥1 (größer oder gleich 1), =1 (exakt gleich 1, den Wert '=1' musst du auch als ≥1 werten) und '-' (Bindestrich). Mache folgende Zuordnungen:
+    - Bei '-' gib 'NA' an.
+    - Bei '<1' gib '< 1' an.
+    - Bei '≥1' gib '≥ 1' an.
+    - Bei '=1' gib '≥ 1' an.
 
 4. **Befunde (findings) zur '» Thrombuslast (proximalster Embolus)':**
 - lae_main_branch_right: Wert hinter 'Rechts Pulmonalhauptarterie', oder 'Keine Okklusion', falls nicht erwähnt. Mögliche Werte: 'Keine Okklusion', 'Totale Okklusion', 'Partielle Okklusion'.
@@ -123,12 +132,14 @@ class Indication(BaseModel):
 
 
 class PerfusionDeficit(str, Enum):
-    NONE = "Keine"
+    NONE = "NA"
+    NO_25 = "Keine"
     LT_25 = "< 25%"
     GE_25 = "≥ 25%"
 
 
 class RightHeartQuotient(str, Enum):
+    NONE = "NA"
     LT_1 = "< 1"
     GE_1 = "≥ 1"
 
@@ -168,8 +179,8 @@ class Findings(BaseModel):
     lae_upper_lobe_left: LobeOcclusion
     lae_lower_lobe_left: LobeOcclusion
     clot_burden_score: float | None
-    perfusion_deficit: PerfusionDeficit | None
-    rv_lv_quotient: RightHeartQuotient | None
+    perfusion_deficit: PerfusionDeficit
+    rv_lv_quotient: RightHeartQuotient
     inflammation: bool
     congestion: bool
     suspect_finding: bool
