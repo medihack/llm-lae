@@ -1,6 +1,8 @@
 import argparse
 import logging
 import os
+import time
+from pathlib import Path
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -31,6 +33,7 @@ def main():
     parser.add_argument("-l", "--limit", type=int)
     parser.add_argument("-s", "--study-id", action="append")
     parser.add_argument("-d", "--debug", action="store_true")
+    parser.add_argument("-n", "--no-timestamp", action="store_true")
 
     args = parser.parse_args()
 
@@ -52,21 +55,9 @@ def main():
     if not open_ai_model:
         raise ValueError("OPENAI_MODEL environment variable is not set.")
 
-    log_file = os.getenv("LOG_FILE")
-    if not log_file:
-        raise ValueError("LOG_FILE environment variable is not set.")
-
     reports_file = os.getenv("REPORTS_FILE")
     if not reports_file:
         raise ValueError("REPORTS_FILE environment variable is not set.")
-
-    validations_file = os.getenv("VALIDATIONS_FILE")
-    if not validations_file:
-        raise ValueError("VALIDATIONS_FILE environment variable is not set.")
-
-    extracted_data_file = os.getenv("EXTRACTED_DATA_FILE")
-    if not extracted_data_file:
-        raise ValueError("EXTRACTED_DATA_FILE environment variable is not set.")
 
     study_id_column = os.getenv("STUDY_ID_COLUMN")
     if not study_id_column:
@@ -75,6 +66,20 @@ def main():
     report_column = os.getenv("REPORT_COLUMN")
     if not report_column:
         raise ValueError("REPORT_COLUMN environment variable is not set.")
+
+    output_dir = os.getenv("OUTPUT_DIR")
+    if not output_dir:
+        raise ValueError("OUTPUT_DIR environment variable is not set.")
+
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+    timestamp = f"_{time.strftime("%Y%m%d-%H%M%S")}"
+    if args.no_timestamp:
+        timestamp = ""
+
+    log_file = f"{output_dir}/log{timestamp}.txt"
+    validations_file = f"{output_dir}/validations{timestamp}.csv"
+    extracted_data_file = f"{output_dir}/extracted_{open_ai_model}{timestamp}.csv"
 
     setup_logging(log_file)
 
