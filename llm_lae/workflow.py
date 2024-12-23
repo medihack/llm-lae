@@ -73,13 +73,13 @@ def main():
 
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    timestamp = f"_{time.strftime("%Y%m%d-%H%M%S")}"
+    timestamp = time.strftime("%Y%m%d-%H%M%S")
     if args.no_timestamp:
         timestamp = ""
 
-    log_file = f"{output_dir}/log{timestamp}.txt"
-    validations_file = f"{output_dir}/validations{timestamp}.csv"
-    extracted_data_file = f"{output_dir}/extracted_{open_ai_model}{timestamp}.csv"
+    log_file = f"{output_dir}/{timestamp}_log.txt"
+    validations_file = f"{output_dir}/{timestamp}_validations.csv"
+    extracted_data_file = f"{output_dir}/{timestamp}_extracted_{open_ai_model}.csv"
 
     setup_logging(log_file)
 
