@@ -1,6 +1,6 @@
 # LLM-LAE
 
-- Install depdendencies with `uv sync`
+- Install dependencies with `uv sync`
 - Create folder `env` and put data in there
 - Copy `example.env` to `.env` and adjust values
 - Run with `uv run workflow`

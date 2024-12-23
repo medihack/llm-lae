@@ -96,3 +96,11 @@ class ExtractedData(BaseModel):
     clinical_information: ClinicalInformation
     indication: Indication
     findings: Findings
+
+
+class LlmResult(TypedDict):
+    extracted_data: ExtractedData
+    study_id: str
+    total_tokens: int
+    prompt_tokens: int
+    completion_tokens: int
