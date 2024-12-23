@@ -39,17 +39,15 @@ JSON-Formatbeschreibung:
 - previous_examination: Wert hinter 'Letzte Voruntersuchung'. 'true', wenn eine Voraufnahme zum Vergleich angegeben ist, sonst 'false'.
 - lae_presence: Wert hinter 'Nachweis einer Lungenarterienembolie'. Werte: 'Ja', 'Nein', 'Verdacht auf', 'Nicht beurteilbar'.
 - clot_burden_score: Wert hinter 'Heidelberg Clot Burden Score (CBS, PMID: 34581626)' als Dezimalzahl oder 'null', wenn keine Angabe vorhanden ist.
-- perfusion_deficit: Wert hinter 'Perfusionsausfälle (DE-CT)'. Mögliche Werte sind: Keine, <25% (kleiner 25 Prozent), ≥25% (größer oder gleich 25 Prozent, =25% (exakt gleich 25 Prozent und '-' (Bindestrich). Mache folgende Zuordnungen:
+- perfusion_deficit: Wert hinter 'Perfusionsausfälle (DE-CT)'. Mache folgende Zuordnungen:
     - Bei '-' gib 'NA' an.
     - Bei 'Keine' gib 'Keine' an.
-    - Bei '<25%' gib '< 25%' an.
-    - Bei '≥25%' gib '≥ 25%' an.
-    - Bei '=25%' gib '≥ 25%' an.
-- rv_lv_quotient: Wert hinter 'RV/LV-Quotient'. Mögliche Werte sind: <1 (kleiner als 1), ≥1 (größer oder gleich 1), =1 (exakt gleich 1, den Wert '=1' musst du auch als ≥1 werten) und '-' (Bindestrich). Mache folgende Zuordnungen:
+    - Bei einem Wert kleiner 25 Prozent gib '< 25%' an.
+    - Bei einem Wert gleich oder größert 25 Prozent gib '≥ 25%' an.
+- rv_lv_quotient: Wert hinter 'RV/LV-Quotient'. Mache folgende Zuordnungen:
     - Bei '-' gib 'NA' an.
-    - Bei '<1' gib '< 1' an.
-    - Bei '≥1' gib '≥ 1' an.
-    - Bei '=1' gib '≥ 1' an.
+    - Bei einem Wert kleiner 1 gib '< 1' an.
+    - Bei einem Wert gleich oder größer 1 gib '≥ 1' an.
 
 4. **Befunde (findings) zur '» Thrombuslast (proximalster Embolus)':**
 - lae_main_branch_right: Wert hinter 'Rechts Pulmonalhauptarterie', oder 'Keine Okklusion', falls nicht erwähnt. Mögliche Werte: 'Keine Okklusion', 'Totale Okklusion', 'Partielle Okklusion'.
