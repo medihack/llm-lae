@@ -56,6 +56,7 @@ class LlmExtractor:
                 {"role": "user", "content": report},
             ],
             response_format=ExtractedData,
+            temperature=0.0,
         )
 
         if self.debug:
