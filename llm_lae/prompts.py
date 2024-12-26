@@ -5,7 +5,7 @@ Ordne die Informationen aus dem Bericht den entsprechenden JSON-Feldern zu. Nutz
 
 JSON-Formatbeschreibung:
 1. **Einträge hinter 'Klinische Angaben' (clinical_information):**
-- keywords: Eine Liste relevanter Schlüsselbegriffe, entnommen aus den Abschnitten 'Klinische Angaben' und 'Fragestellung'.
+- keywords: Eine Liste relevanter Schlagworte (jeweils nur ein Wort) die 'Klinische Angaben' und 'Fragestellung' repräsentieren. Maximal 3 Schlagworte.
 - morbidity: Deine Einschätzung zur der Erkrankungslast des Patienten auf einer Likert-Skala von 1 bis 5. Entscheide anhand der klinischen Angaben:
     - 1 für sehr leichte Erkrankungslast
     - 2 für leichte Erkrankungslast
