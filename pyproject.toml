@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "ipython>=8.31.0",
+    "ollama>=0.4.4",
     "openai>=1.57.4",
     "pandas>=2.2.3",
     "python-dotenv>=1.0.1",
@@ -23,7 +24,7 @@ line-length = 100
 lint.select = ["E", "F", "I"]
 
 [project.scripts]
-workflow = "llm_lae.workflow:main"
+extract = "llm_lae.extract:main"
 
 [build-system]
 requires = ["hatchling"]

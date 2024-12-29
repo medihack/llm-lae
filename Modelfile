@@ -1,4 +1,0 @@
-FROM llama3.3
-
-PARAMETER temperature 0
-PARAMETER num_ctx 8192

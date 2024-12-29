@@ -1,12 +1,6 @@
 from enum import Enum
-from typing import TypedDict
 
 from pydantic import BaseModel
-
-
-class Report(TypedDict):
-    study_id: str
-    report_body: str
 
 
 class ClinicalInformation(BaseModel):
@@ -35,14 +29,12 @@ class Indication(BaseModel):
 
 
 class PerfusionDeficit(str, Enum):
-    NONE = "NA"
-    NO_25 = "Keine"
+    NONE = "Keine"
     LT_25 = "< 25%"
     GE_25 = "≥ 25%"
 
 
 class RightHeartQuotient(str, Enum):
-    NONE = "NA"
     LT_1 = "< 1"
     GE_1 = "≥ 1"
 
@@ -82,8 +74,8 @@ class Findings(BaseModel):
     lae_upper_lobe_left: LobeOcclusion
     lae_lower_lobe_left: LobeOcclusion
     clot_burden_score: float | None
-    perfusion_deficit: PerfusionDeficit
-    rv_lv_quotient: RightHeartQuotient
+    perfusion_deficit: PerfusionDeficit | None
+    rv_lv_quotient: RightHeartQuotient | None
     inflammation: bool
     congestion: bool
     suspect_finding: bool
@@ -98,9 +90,10 @@ class ExtractedData(BaseModel):
     findings: Findings
 
 
-class LlmResult(TypedDict):
+class LlmResult(BaseModel):
     extracted_data: ExtractedData
     study_id: str
     total_tokens: int
     prompt_tokens: int
     completion_tokens: int
+    duration: float

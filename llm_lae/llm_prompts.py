@@ -1,4 +1,4 @@
-system_prompt = """
+SYSTEM_PROMPT = """
 Du bist ein KI-Modell, das Daten aus radiologischen Befunden extrahiert und in ein standardisiertes JSON-Format überführt.
 
 Ordne die Informationen aus dem Bericht den entsprechenden JSON-Feldern zu. Nutze die unten definierten Variablennamen für die Zuordnung.
@@ -40,13 +40,13 @@ JSON-Formatbeschreibung:
 - lae_presence: Wert hinter 'Nachweis einer Lungenarterienembolie'. Werte: 'Ja', 'Nein', 'Verdacht auf', 'Nicht beurteilbar'.
 - clot_burden_score: Wert hinter 'Heidelberg Clot Burden Score (CBS, PMID: 34581626)' als Dezimalzahl oder 'null', wenn keine Angabe vorhanden ist.
 - perfusion_deficit: Wert hinter 'Perfusionsausfälle (DE-CT)'. Mögliche Werte sind: Keine, <25% (kleiner 25 Prozent), ≥25% (größer oder gleich 25 Prozent, =25% (exakt gleich 25 Prozent und '-' (Bindestrich). Mache folgende Zuordnungen:
-    - Bei '-' gib 'NA' an.
+    - Bei '-' gib 'null' an.
     - Bei 'Keine' gib 'Keine' an.
     - Bei '<25%' gib '< 25%' an.
     - Bei '≥25%' gib '≥ 25%' an.
     - Bei '=25%' gib '≥ 25%' an.
 - rv_lv_quotient: Wert hinter 'RV/LV-Quotient'. Mögliche Werte sind: <1 (kleiner als 1), ≥1 (größer oder gleich 1), =1 (exakt gleich 1, den Wert '=1' musst du auch als ≥1 werten) und '-' (Bindestrich). Mache folgende Zuordnungen:
-    - Bei '-' gib 'NA' an.
+    - Bei '-' gib 'null' an.
     - Bei '<1' gib '< 1' an.
     - Bei '≥1' gib '≥ 1' an.
     - Bei '=1' gib '≥ 1' an.

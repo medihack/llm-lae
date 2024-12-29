@@ -1,4 +1,4 @@
-from .models import Findings, LobeOcclusion, MainBranchOcclusion
+from .llm_models import Findings, LobeOcclusion, MainBranchOcclusion
 
 
 def calc_cbs_score(findings: Findings) -> float:
