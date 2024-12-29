@@ -25,6 +25,7 @@ lint.select = ["E", "F", "I"]
 
 [project.scripts]
 extract = "llm_lae.extract:main"
+setup_models = "llm_lae.setup_models:main"
 
 [build-system]
 requires = ["hatchling"]
