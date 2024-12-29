@@ -168,7 +168,7 @@ class RulesExtractor:
         elif iv in ["", "-"]:
             ev = None
         elif re.fullmatch(r"\d+(,\d+)? HU", iv):
-            ev = int(iv.split(" ")[0])
+            ev = round(float(iv.split(" ")[0].replace(",", ".")))
         else:
             ev = ErrorCode.INVALID_VALUE
 
