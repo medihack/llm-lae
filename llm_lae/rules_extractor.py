@@ -214,7 +214,7 @@ class RulesExtractor:
         if iv is None:
             iv = ""
             ev = ErrorCode.MISSING_FIELD
-        elif not re.fullmatch(r"\d+(,\d+)?", iv) or not (0 <= float(iv.replace(",", ".")) <= 40):
+        elif not re.fullmatch(r"\d+(,\d+)?", iv) or not (float(iv.replace(",", ".")) >= 0):
             ev = ErrorCode.INVALID_VALUE
         else:
             ev = float(iv.replace(",", "."))
