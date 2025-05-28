@@ -60,7 +60,7 @@ class LlmClient:
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": report["report_body"]},
             ],
-            options={"temperature": 0.0, "num_ctx": 8192},
+            options={"temperature": 0.0, "num_ctx": 8192, "num_predict": 1000},
             format=ExtractedData.model_json_schema(),
         )
         end = timer()
