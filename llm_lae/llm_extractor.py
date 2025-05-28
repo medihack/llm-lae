@@ -38,8 +38,10 @@ class LlmExtractor:
         ):
             logging.info(f"Extracting data of study ID: {report['study_id']}")
 
-            result = self.client.extract(report)
-            results.append(result)
+            try:
+                results.append(self.client.extract(report))
+            except Exception:
+                logging.exception(f"Failed to extract data of study {report['study_id']}.")
 
         return results
 
