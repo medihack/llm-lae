@@ -199,7 +199,7 @@ class RulesExtractor:
             ev = LaePresence.NO
         elif iv == "Ja":
             ev = LaePresence.YES
-        elif iv == "Verdacht auf":
+        elif iv == "Verdacht auf Lungenarterienembolie":
             ev = LaePresence.SUSPECTED
         elif iv == "Nicht beurteilbar":
             ev = LaePresence.NOT_ASSESSABLE
