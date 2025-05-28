@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 
 from llm_lae.llm_extractor import LlmExtractor
 from llm_lae.rules_extractor import RulesExtractor
+from llm_lae.utils import sanitize_filename
 
 from .generic_models import Report
 
@@ -108,7 +109,8 @@ def main():
         ).extract()
 
     if llm_model:
-        extracted_data_file = f"{output_dir}/{timestamp}_extracted_{llm_model}.csv"
+        sanitized_filename = sanitize_filename(f"{timestamp}_extracted_{llm_model}.csv")
+        extracted_data_file = f"{output_dir}/{sanitized_filename}"
 
         LlmExtractor(
             model=llm_model,

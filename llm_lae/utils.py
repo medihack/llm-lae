@@ -1,4 +1,16 @@
+import re
+
 from .llm_models import Findings, LobeOcclusion, MainBranchOcclusion
+
+
+def sanitize_filename(filename):
+    # Remove invalid characters: \ / : * ? " < > |
+    sanitized = re.sub(r'[\\/:*?"<>|]', "_", filename)
+    # Remove control characters (ASCII codes 0-31)
+    sanitized = re.sub(r"[\x00-\x1f]", "_", sanitized)
+    # Trim trailing spaces and periods
+    sanitized = sanitized.rstrip(" .")
+    return sanitized
 
 
 def calc_cbs_score(findings: Findings) -> float:
