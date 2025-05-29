@@ -182,10 +182,14 @@ class RulesExtractor:
             ev = ErrorCode.MISSING_FIELD
         elif iv in ["", "-"]:
             ev = None
-        elif iv in ["0 (keine Artefakte)", "1", "2", "3", "4", "5 (nicht beurteilbar)"]:
-            ev = int(iv[0])
         else:
-            ev = ErrorCode.INVALID_VALUE
+            match = re.match(r"(\d+)(?:\s+.*)?$", iv)
+            if match:
+                ev = int(match.group(1))
+                if ev < 0 or ev > 5:
+                    ev = ErrorCode.INVALID_VALUE
+            else:
+                ev = ErrorCode.INVALID_VALUE
 
         return iv, ev
 
