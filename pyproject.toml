@@ -12,6 +12,7 @@ dependencies = [
     "python-dotenv>=1.0.1",
     "rich>=13.9.4",
     "scikit-learn>=1.6.0",
+    "stamina>=25.1.0",
 ]
 
 [tool.pyright]

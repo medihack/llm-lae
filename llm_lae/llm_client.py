@@ -1,8 +1,9 @@
 import os
 from timeit import default_timer as timer
 
+import stamina
 from ollama import Client
-from openai import OpenAI
+from openai import OpenAI, RateLimitError
 
 from .conf import OPEN_AI_MODELS
 from .generic_models import Report
@@ -24,6 +25,7 @@ class LlmClient:
         else:
             return self.extract_with_ollama(self.client, report)
 
+    @stamina.retry(on=RateLimitError, attempts=5)
     def extract_with_openai(self, client: OpenAI, report: Report) -> LlmResult:
         start = timer()
         completion = client.beta.chat.completions.parse(
